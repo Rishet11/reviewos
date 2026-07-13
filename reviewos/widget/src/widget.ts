@@ -1,5 +1,6 @@
 import { createStore } from "./store";
 import {
+  fetchAiSummary,
   fetchAttributes,
   fetchProduct,
   fetchReviews,
@@ -7,6 +8,7 @@ import {
   postHelpful,
   postReview,
 } from "./api";
+import { renderAiSummary } from "./blocks/ai-summary";
 import { renderSummary } from "./blocks/summary";
 import { renderDistribution } from "./blocks/distribution";
 import { renderFilters } from "./blocks/filters";
@@ -15,7 +17,7 @@ import { renderWriteModal } from "./blocks/write";
 import { readFiltersFromUrl, writeFiltersToUrl } from "./url";
 import type { WidgetState } from "./types";
 
-const ALL_BLOCKS = ["summary", "distribution", "filters", "feed", "write"];
+const ALL_BLOCKS = ["ai-summary", "summary", "distribution", "filters", "feed", "write"];
 const PAGE_SIZE = 5;
 
 export function mountWidget(el: HTMLElement) {
@@ -41,6 +43,8 @@ export function mountWidget(el: HTMLElement) {
     product: null,
     summary: null,
     attributeDefs: [],
+    aiSummary: null,
+    aiSummaryLoading: false,
     reviews: [],
     total: 0,
     page: 1,
@@ -75,6 +79,7 @@ export function mountWidget(el: HTMLElement) {
     }
 
     const sections: string[] = [];
+    if (state.blocks.has("ai-summary")) sections.push(renderAiSummary(state));
     if (state.blocks.has("summary")) sections.push(renderSummary(state));
     if (state.blocks.has("distribution")) sections.push(renderDistribution(state));
     if (state.blocks.has("filters")) sections.push(renderFilters(state));
@@ -116,13 +121,31 @@ export function mountWidget(el: HTMLElement) {
     }
   }
 
+  // Separate seq counter from reviews: filter changes trigger both fetches,
+  // but they resolve independently and shouldn't clobber each other.
+  let aiSummarySeq = 0;
+
+  async function loadAiSummary() {
+    if (!store.getState().blocks.has("ai-summary")) return;
+    const seq = ++aiSummarySeq;
+    store.setState({ aiSummaryLoading: true });
+    try {
+      const summary = await fetchAiSummary(apiBase, productSlug, store.getState().attrFilters);
+      if (seq !== aiSummarySeq) return;
+      store.setState({ aiSummary: summary, aiSummaryLoading: false });
+    } catch {
+      if (seq !== aiSummarySeq) return;
+      store.setState({ aiSummary: null, aiSummaryLoading: false });
+    }
+  }
+
   async function refetchFiltered() {
     writeFiltersToUrl(
       store.getState().attrFilters,
       store.getState().ratingFilter,
       store.getState().sort
     );
-    await loadReviews(true);
+    await Promise.all([loadReviews(true), loadAiSummary()]);
   }
 
   async function init() {
@@ -145,7 +168,7 @@ export function mountWidget(el: HTMLElement) {
         loading: false,
       });
 
-      await loadReviews(true);
+      await Promise.all([loadReviews(true), loadAiSummary()]);
     } catch (err) {
       console.error("[reviewos] init failed", err);
       store.setState({ loading: false, error: "init_failed" });

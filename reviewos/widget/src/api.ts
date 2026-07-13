@@ -1,4 +1,4 @@
-import type { AttributeDef, Product, Review, Summary, Sort } from "./types";
+import type { AiSummary, AttributeDef, Product, Review, Summary, Sort } from "./types";
 
 async function getJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -53,6 +53,22 @@ export async function fetchReviews(apiBase: string, args: ListReviewsArgs) {
     pageSize: number;
   }>(`${apiBase}/api/reviews?${params.toString()}`);
   return data;
+}
+
+export async function fetchAiSummary(
+  apiBase: string,
+  productSlug: string,
+  attrFilters: Record<string, string>
+) {
+  const params = new URLSearchParams();
+  params.set("product", productSlug);
+  for (const [key, value] of Object.entries(attrFilters)) {
+    params.set(key, value);
+  }
+  const data = await getJSON<{ summary: AiSummary | null }>(
+    `${apiBase}/api/ai/summary?${params.toString()}`
+  );
+  return data.summary;
 }
 
 export async function postHelpful(apiBase: string, reviewId: string) {

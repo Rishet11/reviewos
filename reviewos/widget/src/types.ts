@@ -42,6 +42,15 @@ export type Summary = {
 
 export type Sort = "recent" | "helpful" | "rating_desc" | "rating_asc";
 
+export type AiSummary = {
+  pros: string[];
+  cons: string[];
+  summaryText: string;
+  reviewCount: number;
+  scope: string;
+  cohortKey: string;
+};
+
 export type WidgetState = {
   apiBase: string;
   productSlug: string;
@@ -52,6 +61,9 @@ export type WidgetState = {
   product: Product | null;
   summary: Summary | null;
   attributeDefs: AttributeDef[];
+
+  aiSummary: AiSummary | null;
+  aiSummaryLoading: boolean;
 
   reviews: Review[];
   total: number;

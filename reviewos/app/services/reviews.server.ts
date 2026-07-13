@@ -40,15 +40,7 @@ export async function listReviews({
     include: { media: true },
   });
 
-  let filtered = all.filter((review) => {
-    if (rating && review.rating !== rating) return false;
-
-    const attrs = safeParse(review.attributes) ?? {};
-    for (const [key, value] of Object.entries(filters)) {
-      if (String(attrs[key]) !== value) return false;
-    }
-    return true;
-  });
+  let filtered = filterReviews(all, filters, rating);
 
   filtered = sortReviews(filtered, sort);
 
@@ -57,6 +49,35 @@ export async function listReviews({
   const paged = filtered.slice(start, start + pageSize);
 
   return { reviews: paged, total, page, pageSize };
+}
+
+export function filterReviews<T extends { rating: number; attributes: string }>(
+  reviews: T[],
+  filters: Record<string, string>,
+  rating?: number
+): T[] {
+  return reviews.filter((review) => {
+    if (rating && review.rating !== rating) return false;
+
+    const attrs = safeParse(review.attributes) ?? {};
+    for (const [key, value] of Object.entries(filters)) {
+      if (String(attrs[key]) !== value) return false;
+    }
+    return true;
+  });
+}
+
+// Fetches all approved reviews for a product matching the given attribute
+// filters, unpaginated. Used by AI summary generation, which needs the full
+// cohort rather than a page of it.
+export async function getApprovedReviewsForCohort(
+  productId: string,
+  filters: Record<string, string>
+) {
+  const all = await prisma.review.findMany({
+    where: { productId, status: "approved" },
+  });
+  return filterReviews(all, filters);
 }
 
 function sortReviews<T extends { createdAt: Date; helpfulCount: number; rating: number }>(
@@ -121,6 +142,8 @@ export type CreateReviewInput = {
   body: string;
   attributes?: string;
   source?: string;
+  status?: string;
+  createdAt?: Date;
 };
 
 export async function createReview(data: CreateReviewInput) {
@@ -134,7 +157,8 @@ export async function createReview(data: CreateReviewInput) {
       body: data.body,
       attributes: data.attributes ?? "{}",
       source: data.source ?? "website",
-      status: "pending",
+      status: data.status ?? "pending",
+      ...(data.createdAt ? { createdAt: data.createdAt } : {}),
     },
   });
 }
