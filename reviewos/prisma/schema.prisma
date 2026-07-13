@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  category    String
+  description String
+  price       Int
+  imageUrl    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reviews          Review[]
+  marketplaceStats MarketplaceStat[]
+  aiSummaries      AiSummary[]
+}
+
+model Review {
+  id                  String    @id @default(cuid())
+  productId           String
+  product             Product   @relation(fields: [productId], references: [id])
+  customerName        String
+  customerEmail       String?
+  rating              Int
+  title               String?
+  body                String
+  helpfulCount        Int       @default(0)
+  merchantReply       String?
+  merchantRepliedAt   DateTime?
+  status              String    @default("approved")
+  verifiedBuyer       Boolean   @default(false)
+  verifiedMarketplace Boolean   @default(false)
+  source              String    @default("website")
+  attributes          String
+  media               ReviewMedia[]
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model ReviewMedia {
+  id        String   @id @default(cuid())
+  reviewId  String
+  review    Review   @relation(fields: [reviewId], references: [id])
+  type      String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AttributeDefinition {
+  id              String   @id @default(cuid())
+  productCategory String
+  key             String
+  label           String
+  options         String
+  display         Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([productCategory, key])
+}
+
+model MarketplaceSource {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  logoUrl   String
+  baseUrl   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stats MarketplaceStat[]
+}
+
+model MarketplaceStat {
+  id          String            @id @default(cuid())
+  productId   String
+  product     Product           @relation(fields: [productId], references: [id])
+  sourceId    String
+  source      MarketplaceSource @relation(fields: [sourceId], references: [id])
+  rating      Float
+  reviewCount Int
+  url         String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([productId, sourceId])
+}
+
+model AiSummary {
+  id                     String   @id @default(cuid())
+  productId              String
+  product                Product  @relation(fields: [productId], references: [id])
+  scope                  String
+  cohortKey              String   @default("")
+  pros                   String
+  cons                   String
+  summaryText            String
+  reviewCountAtGeneration Int
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@unique([productId, scope, cohortKey])
+}
+
+model Settings {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

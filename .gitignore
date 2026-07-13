@@ -1,0 +1,11 @@
+.DS_Store
+node_modules/
+reviewos/node_modules/
+reviewos/.env
+reviewos/.react-router/
+reviewos/build/
+reviewos/prisma/dev.db
+reviewos/prisma/dev.db-journal
+reviewos/prisma/prisma/
+dist/
+*.log
