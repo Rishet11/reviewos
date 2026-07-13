@@ -1,48 +1,22 @@
-# STATE — ReviewOS
+# STATE (updated 2026-07-14 evening)
 
-_Last updated: 2026-07-14_
+## Done
+- Docs: CLAUDE.md (rules + orchestration policy), PRD.md, ROADMAP.md (Phase D → 0-8), docs/RESEARCH.md (verified facts, cite instead of re-searching).
+- D1: React Router 7 + Prisma/SQLite app in `reviewos/`, full schema, services (`app/services/`), JSON APIs, multi-category seed (3 products, ~90 reviews). Verified.
+- D2: framework-free widget bundle (`widget/` → `public/widget/reviewos.js`), blocks: summary, distribution bars, dynamic filter chips (URL-synced), feed, write-review modal. Demo pages `/demo/:slug` + index `/`. Verified in headless browser after fixing widget-mount vs React-hydration race (commit 5e7e2d7). User has seen it working.
 
-## Where we are
-- Scope decided: real sellable product (not demo), built in phases per ROADMAP.md.
-- Research complete → docs/RESEARCH.md (Shopify stack, App Store rules, competitors, marketplace-sourcing legal verdict: NO scraping, merchant-owned CSV/manual data only, hosting: Render+Postgres+R2).
-- Docs written: CLAUDE.md, PRD.md, ROADMAP.md, docs/RESEARCH.md, STATE.md.
-- Shopify CLI 4.5.0 installed; Node v26.5 OK. No code yet — Phase 0 blockers below, then Phase 1 scaffold.
-- Decision (2026-07-14): marketplace data is dual-mode. Default merchant-owned (manual + CSV); optional flag-gated live-fetch connector (BYO third-party API key, Phase 5b) — stakeholder insisted despite disclosed ToS/legal risk (PRD "Live fetch risk").
-- Phase 5b live-fetch code is excluded from App Store submission builds (review finding, 2026-07-14).
-- Delegation policy: this session orchestrates; implementation goes to subagents (haiku → sonnet → opus escalation, see CLAUDE.md).
-
-## Course change (2026-07-14)
-- Build order: **standalone demo website first (Phase D)**, Shopify app after stakeholder buy-in. Portability rules in CLAUDE.md guarantee reuse.
-- AI provider: **Groq** (free, OpenAI-compatible) instead of Anthropic; pluggable provider interface.
-- Shopify account: user reports created (unverified). Shopify CLI 4.5.0 installed.
-
-## Blockers (user must do)
-1. For D3: free Groq API key (console.groq.com) → `reviewos/.env` as `GROQ_API_KEY`. Not needed for D1/D2.
-2. For Phase 0 later: confirm development store exists in the Shopify Dev Dashboard.
-
-## Next actions
-1. D1 done (2026-07-14). Then D2 widget core. One milestone at a time; update this file after each.
-
-## D1 done (2026-07-14)
-- Built: React Router 7 (framework mode, TS) + Prisma/SQLite app in `reviewos/`. Schema (Product, Review, ReviewMedia, AttributeDefinition, MarketplaceSource, MarketplaceStat, AiSummary, Settings), services layer in `app/services/*.server.ts`, JSON API routes under `app/routes/api.*`, seed script with 3 products and ~90 reviews.
-- Verified: migrate, seed, typecheck, dev server all pass; curl confirmed generic attribute filtering (skinType=dry narrowed 26 to 6 reviews).
-- Git repo initialized at repo root, single commit "D1: skeleton app, schema, seed" (e9185ce).
-
-Run it:
-```
-cd reviewos
-npm install   # if needed
-npx prisma migrate dev
-npm run seed
-npm run dev
-```
-
-## D2 done (2026-07-14)
-- Built: framework-free TypeScript widget (`reviewos/widget/src/`), esbuild bundle via `npm run build:widget` to `public/widget/reviewos.js` + `reviewos.css`. Auto-mounts into any `<div data-reviewos data-product data-api data-blocks>`; independent blocks (summary, distribution, filters, feed, write) share one state store. Filter chips are fully driven by /api/attributes (no hardcoded attribute names); selections sync to and restore from host-page URL query params. CSS scoped `.rvos-`, themeable via `--rvos-*` custom properties.
-- New API route: GET /api/reviews/summary?product=slug.
-- Demo pages: `/` product index, `/demo/:slug` e-commerce shell embedding the widget via plain script tag + div (third-party style, no React imports in widget).
-- Verified: build:widget + typecheck pass, `node --check` on bundle OK, curl 200 on /demo/glow-lab-vitamin-c-serum with widget div + script present, summary/reviews/attributes APIs return correct JSON. Diff-reviewer pass done; fixed 3 findings (double helpful-vote, stale fetch race via request sequencing, load-more in-flight guard).
-- View it: `cd reviewos && npm run dev` then http://localhost:5173/demo/glow-lab-vitamin-c-serum
+## In progress
+- Nothing mid-file. Next milestone not started.
 
 ## Next
-D3 (AI summaries; needs GROQ_API_KEY in reviewos/.env, see Blockers).
+- D3: Groq AI service — provider-pluggable `app/services/ai/`, overall + filter-aware cohort + per-marketplace summaries (DB-cached in AiSummary model, threshold-gated, NEVER per-page-load), ai-summary widget block, one-click AI demo-review generator in a minimal `/admin`. Exit: summary changes when filter chips clicked.
+- D4: marketplace trust badges block + UGC gallery with lightbox (data/models already seeded).
+- D5: design polish (impeccable / frontend-design skill) + deploy to Vercel/Render free tier, shareable URL.
+- After Phase D: stakeholder feedback → Shopify phases per ROADMAP.md.
+
+## Gotchas
+- Run: `cd reviewos && npm run dev` → http://localhost:5173/demo/glow-lab-vitamin-c-serum (kill stale: `lsof -ti:5173 | xargs kill`).
+- Env: GROQ_API_KEY in `reviewos/.env` (present; user must ROTATE it post-demo, it was exposed in chat). DATABASE_URL is relative to prisma/ ("file:./dev.db").
+- Widget must mount after React hydration (window.load in widget/src/index.ts) — do not "simplify" back to DOMContentLoaded, it breaks everything silently.
+- Reseed: `npm run seed`. Typecheck: `npm run typecheck`. Playwright is installed for headless verification (screenshots + console errors).
+- Follow CLAUDE.md orchestration policy: delegate builds to sonnet subagents with full cold-start specs, verify their claims yourself, update this file after each milestone.
