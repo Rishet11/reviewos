@@ -37,5 +37,12 @@ npm run seed
 npm run dev
 ```
 
+## D2 done (2026-07-14)
+- Built: framework-free TypeScript widget (`reviewos/widget/src/`), esbuild bundle via `npm run build:widget` to `public/widget/reviewos.js` + `reviewos.css`. Auto-mounts into any `<div data-reviewos data-product data-api data-blocks>`; independent blocks (summary, distribution, filters, feed, write) share one state store. Filter chips are fully driven by /api/attributes (no hardcoded attribute names); selections sync to and restore from host-page URL query params. CSS scoped `.rvos-`, themeable via `--rvos-*` custom properties.
+- New API route: GET /api/reviews/summary?product=slug.
+- Demo pages: `/` product index, `/demo/:slug` e-commerce shell embedding the widget via plain script tag + div (third-party style, no React imports in widget).
+- Verified: build:widget + typecheck pass, `node --check` on bundle OK, curl 200 on /demo/glow-lab-vitamin-c-serum with widget div + script present, summary/reviews/attributes APIs return correct JSON. Diff-reviewer pass done; fixed 3 findings (double helpful-vote, stale fetch race via request sequencing, load-more in-flight guard).
+- View it: `cd reviewos && npm run dev` then http://localhost:5173/demo/glow-lab-vitamin-c-serum
+
 ## Next
-D2.
+D3 (AI summaries; needs GROQ_API_KEY in reviewos/.env, see Blockers).
