@@ -42,6 +42,18 @@ export type Summary = {
 
 export type Sort = "recent" | "helpful" | "rating_desc" | "rating_asc";
 
+export type MarketplaceStat = {
+  id: string;
+  rating: number;
+  reviewCount: number;
+  url: string;
+  source: {
+    name: string;
+    logoUrl: string;
+    baseUrl: string;
+  };
+};
+
 export type AiSummary = {
   pros: string[];
   cons: string[];
@@ -64,6 +76,12 @@ export type WidgetState = {
 
   aiSummary: AiSummary | null;
   aiSummaryLoading: boolean;
+
+  marketplaceStats: MarketplaceStat[];
+
+  lightboxIndex: number | null;
+  lightboxReturnIndex: number | null;
+  galleryReviews: Review[];
 
   reviews: Review[];
   total: number;

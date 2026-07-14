@@ -2,6 +2,7 @@ import { createStore } from "./store";
 import {
   fetchAiSummary,
   fetchAttributes,
+  fetchMarketplaceStats,
   fetchProduct,
   fetchReviews,
   fetchSummary,
@@ -10,14 +11,25 @@ import {
 } from "./api";
 import { renderAiSummary } from "./blocks/ai-summary";
 import { renderSummary } from "./blocks/summary";
+import { renderTrustBadges } from "./blocks/trust-badges";
 import { renderDistribution } from "./blocks/distribution";
 import { renderFilters } from "./blocks/filters";
+import { getGalleryPhotos, renderLightbox, renderUgcGallery } from "./blocks/ugc-gallery";
 import { renderFeed } from "./blocks/feed";
 import { renderWriteModal } from "./blocks/write";
 import { readFiltersFromUrl, writeFiltersToUrl } from "./url";
 import type { WidgetState } from "./types";
 
-const ALL_BLOCKS = ["ai-summary", "summary", "distribution", "filters", "feed", "write"];
+const ALL_BLOCKS = [
+  "ai-summary",
+  "summary",
+  "trust-badges",
+  "distribution",
+  "filters",
+  "ugc-gallery",
+  "feed",
+  "write",
+];
 const PAGE_SIZE = 5;
 
 export function mountWidget(el: HTMLElement) {
@@ -45,6 +57,10 @@ export function mountWidget(el: HTMLElement) {
     attributeDefs: [],
     aiSummary: null,
     aiSummaryLoading: false,
+    marketplaceStats: [],
+    lightboxIndex: null,
+    lightboxReturnIndex: null,
+    galleryReviews: [],
     reviews: [],
     total: 0,
     page: 1,
@@ -81,12 +97,29 @@ export function mountWidget(el: HTMLElement) {
     const sections: string[] = [];
     if (state.blocks.has("ai-summary")) sections.push(renderAiSummary(state));
     if (state.blocks.has("summary")) sections.push(renderSummary(state));
+    if (state.blocks.has("trust-badges")) sections.push(renderTrustBadges(state));
     if (state.blocks.has("distribution")) sections.push(renderDistribution(state));
     if (state.blocks.has("filters")) sections.push(renderFilters(state));
+    if (state.blocks.has("ugc-gallery")) sections.push(renderUgcGallery(state));
     if (state.blocks.has("feed")) sections.push(renderFeed(state));
 
-    root.innerHTML = sections.join("") + (state.blocks.has("write") ? renderWriteModal(state) : "");
+    root.innerHTML =
+      sections.join("") +
+      (state.blocks.has("write") ? renderWriteModal(state) : "") +
+      renderLightbox(state);
+
+    if (pendingFocusIndex !== null) {
+      const idx = pendingFocusIndex;
+      pendingFocusIndex = null;
+      const el = root.querySelector<HTMLElement>(`[data-photo-index="${idx}"]`);
+      el?.focus();
+    }
   }
+
+  // Set right before a re-render that closes the lightbox, so focus can be
+  // restored to the thumbnail that opened it (its DOM node was replaced by
+  // the innerHTML re-render, so we re-query for it by index after render).
+  let pendingFocusIndex: number | null = null;
 
   store.subscribe(render);
 
@@ -121,6 +154,31 @@ export function mountWidget(el: HTMLElement) {
     }
   }
 
+  // Gallery pulls photos from all reviews matching the current filters, not
+  // just the visible feed page, so it fetches separately with a large page.
+  let gallerySeq = 0;
+
+  async function loadGallery() {
+    if (!store.getState().blocks.has("ugc-gallery")) return;
+    const state = store.getState();
+    const seq = ++gallerySeq;
+    try {
+      const result = await fetchReviews(apiBase, {
+        productSlug,
+        rating: state.ratingFilter,
+        attrFilters: state.attrFilters,
+        sort: state.sort,
+        page: 1,
+        pageSize: 200,
+      });
+      if (seq !== gallerySeq) return;
+      store.setState({ galleryReviews: result.reviews });
+    } catch {
+      if (seq !== gallerySeq) return;
+      store.setState({ galleryReviews: [] });
+    }
+  }
+
   // Separate seq counter from reviews: filter changes trigger both fetches,
   // but they resolve independently and shouldn't clobber each other.
   let aiSummarySeq = 0;
@@ -140,12 +198,15 @@ export function mountWidget(el: HTMLElement) {
   }
 
   async function refetchFiltered() {
+    if (store.getState().lightboxIndex !== null) {
+      store.setState({ lightboxIndex: null, lightboxReturnIndex: null });
+    }
     writeFiltersToUrl(
       store.getState().attrFilters,
       store.getState().ratingFilter,
       store.getState().sort
     );
-    await Promise.all([loadReviews(true), loadAiSummary()]);
+    await Promise.all([loadReviews(true), loadAiSummary(), loadGallery()]);
   }
 
   async function init() {
@@ -168,7 +229,13 @@ export function mountWidget(el: HTMLElement) {
         loading: false,
       });
 
-      await Promise.all([loadReviews(true), loadAiSummary()]);
+      if (store.getState().blocks.has("trust-badges")) {
+        fetchMarketplaceStats(apiBase, productSlug)
+          .then((stats) => store.setState({ marketplaceStats: stats }))
+          .catch(() => store.setState({ marketplaceStats: [] }));
+      }
+
+      await Promise.all([loadReviews(true), loadAiSummary(), loadGallery()]);
     } catch (err) {
       console.error("[reviewos] init failed", err);
       store.setState({ loading: false, error: "init_failed" });
@@ -247,6 +314,50 @@ export function mountWidget(el: HTMLElement) {
     if (action === "set-write-rating") {
       store.setState({ writeRating: Number(target.dataset.value) });
       return;
+    }
+
+    if (action === "open-lightbox") {
+      const idx = Number(target.dataset.photoIndex);
+      store.setState({ lightboxIndex: idx, lightboxReturnIndex: idx });
+      return;
+    }
+
+    if (action === "close-lightbox") {
+      pendingFocusIndex = store.getState().lightboxReturnIndex;
+      store.setState({ lightboxIndex: null, lightboxReturnIndex: null });
+      return;
+    }
+
+    if (action === "lightbox-prev") {
+      const current = store.getState().lightboxIndex;
+      if (current !== null && current > 0) store.setState({ lightboxIndex: current - 1 });
+      return;
+    }
+
+    if (action === "lightbox-next") {
+      const state = store.getState();
+      const total = getGalleryPhotos(state).length;
+      if (state.lightboxIndex !== null && state.lightboxIndex < total - 1) {
+        store.setState({ lightboxIndex: state.lightboxIndex + 1 });
+      }
+      return;
+    }
+  });
+
+  document.addEventListener("keydown", (evt) => {
+    const state = store.getState();
+    if (state.lightboxIndex === null) return;
+
+    if (evt.key === "Escape") {
+      pendingFocusIndex = state.lightboxReturnIndex;
+      store.setState({ lightboxIndex: null, lightboxReturnIndex: null });
+    } else if (evt.key === "ArrowLeft") {
+      if (state.lightboxIndex > 0) store.setState({ lightboxIndex: state.lightboxIndex - 1 });
+    } else if (evt.key === "ArrowRight") {
+      const total = getGalleryPhotos(state).length;
+      if (state.lightboxIndex < total - 1) {
+        store.setState({ lightboxIndex: state.lightboxIndex + 1 });
+      }
     }
   });
 

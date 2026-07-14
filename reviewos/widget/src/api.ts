@@ -1,4 +1,4 @@
-import type { AiSummary, AttributeDef, Product, Review, Summary, Sort } from "./types";
+import type { AiSummary, AttributeDef, MarketplaceStat, Product, Review, Summary, Sort } from "./types";
 
 async function getJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -69,6 +69,13 @@ export async function fetchAiSummary(
     `${apiBase}/api/ai/summary?${params.toString()}`
   );
   return data.summary;
+}
+
+export async function fetchMarketplaceStats(apiBase: string, slug: string) {
+  const data = await getJSON<{ stats: MarketplaceStat[] }>(
+    `${apiBase}/api/marketplace?product=${encodeURIComponent(slug)}`
+  );
+  return data.stats;
 }
 
 export async function postHelpful(apiBase: string, reviewId: string) {

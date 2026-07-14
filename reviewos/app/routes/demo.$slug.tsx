@@ -75,7 +75,7 @@ export default function DemoProduct() {
         data-reviewos
         data-product={product.slug}
         data-api=""
-        data-blocks="ai-summary,summary,distribution,filters,feed,write"
+        data-blocks="ai-summary,summary,trust-badges,distribution,filters,ugc-gallery,feed,write"
       />
       <link rel="stylesheet" href="/widget/reviewos.css" />
       <script src="/widget/reviewos.js" defer />
