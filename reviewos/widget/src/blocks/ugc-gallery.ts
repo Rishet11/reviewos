@@ -60,7 +60,7 @@ export function renderLightbox(state: WidgetState): string {
   const snippet = review.title || review.body;
 
   return `
-    <div class="rvos-lightbox" data-action="close-lightbox" role="dialog" aria-modal="true">
+    <div class="rvos-lightbox" data-action="close-lightbox" tabindex="-1" role="dialog" aria-modal="true">
       <button type="button" class="rvos-lightbox__close" data-action="close-lightbox" aria-label="Close">&times;</button>
       ${
         index > 0
@@ -72,7 +72,7 @@ export function renderLightbox(state: WidgetState): string {
           ? `<button type="button" class="rvos-lightbox__nav rvos-lightbox__nav--next" data-action="lightbox-next" aria-label="Next photo">&#8250;</button>`
           : ""
       }
-      <div class="rvos-lightbox__content" onclick="event.stopPropagation()">
+      <div class="rvos-lightbox__content">
         <img class="rvos-lightbox__image" src="${esc(photo.url)}" alt="Photo from ${esc(review.customerName)}" />
         <div class="rvos-lightbox__meta">
           <div class="rvos-lightbox__author">${esc(review.customerName)}</div>

@@ -23,7 +23,8 @@ export function readFiltersFromUrl(attributeDefs: AttributeDef[]) {
 export function writeFiltersToUrl(
   attrFilters: Record<string, string>,
   rating: number | null,
-  sort: Sort
+  sort: Sort,
+  push = false
 ) {
   const params = new URLSearchParams(window.location.search);
 
@@ -41,5 +42,9 @@ export function writeFiltersToUrl(
 
   const query = params.toString();
   const url = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-  window.history.replaceState(null, "", url);
+  if (push) {
+    window.history.pushState(null, "", url);
+  } else {
+    window.history.replaceState(null, "", url);
+  }
 }

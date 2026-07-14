@@ -113,13 +113,19 @@ export function mountWidget(el: HTMLElement) {
       pendingFocusIndex = null;
       const el = root.querySelector<HTMLElement>(`[data-photo-index="${idx}"]`);
       el?.focus();
+    } else if (state.lightboxIndex !== null && prevLightboxIndex === null) {
+      // Move focus into the dialog when it opens (keyboard/screen-reader
+      // users land inside it; Escape and arrows already work globally).
+      root.querySelector<HTMLElement>(".rvos-lightbox")?.focus();
     }
+    prevLightboxIndex = state.lightboxIndex;
   }
 
   // Set right before a re-render that closes the lightbox, so focus can be
   // restored to the thumbnail that opened it (its DOM node was replaced by
   // the innerHTML re-render, so we re-query for it by index after render).
   let pendingFocusIndex: number | null = null;
+  let prevLightboxIndex: number | null = null;
 
   store.subscribe(render);
 
@@ -197,17 +203,33 @@ export function mountWidget(el: HTMLElement) {
     }
   }
 
-  async function refetchFiltered() {
+  async function refetchFiltered(writeUrl = true) {
     if (store.getState().lightboxIndex !== null) {
       store.setState({ lightboxIndex: null, lightboxReturnIndex: null });
     }
-    writeFiltersToUrl(
-      store.getState().attrFilters,
-      store.getState().ratingFilter,
-      store.getState().sort
-    );
+    if (writeUrl) {
+      // Each user-driven filter/sort change pushes a history entry so the
+      // browser Back button steps back through filter states instead of
+      // leaving the page.
+      writeFiltersToUrl(
+        store.getState().attrFilters,
+        store.getState().ratingFilter,
+        store.getState().sort,
+        true
+      );
+    }
     await Promise.all([loadReviews(true), loadAiSummary(), loadGallery()]);
   }
+
+  window.addEventListener("popstate", () => {
+    const restored = readFiltersFromUrl(store.getState().attributeDefs);
+    store.setState({
+      attrFilters: restored.attrFilters,
+      ratingFilter: restored.rating,
+      sort: restored.sort,
+    });
+    void refetchFiltered(false);
+  });
 
   async function init() {
     try {
@@ -246,6 +268,16 @@ export function mountWidget(el: HTMLElement) {
     const target = (evt.target as HTMLElement).closest<HTMLElement>("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
+
+    // Backdrop elements (modal overlay, lightbox root) carry a close action
+    // that must only fire on a direct backdrop click. Inner clicks bubble up
+    // to them via closest(), so without this guard any click inside the
+    // dialog would close it (the old inline stopPropagation "fix" for that
+    // broke every delegated action inside the dialog instead).
+    const isBackdrop =
+      target.classList.contains("rvos-modal-overlay") ||
+      target.classList.contains("rvos-lightbox");
+    if (isBackdrop && evt.target !== target) return;
 
     if (action === "filter-rating") {
       const value = target.dataset.rating;

@@ -7,7 +7,7 @@ export function renderWriteModal(state: WidgetState): string {
   if (state.writeSuccess) {
     return `
       <div class="rvos-modal-overlay" data-action="close-write">
-        <div class="rvos-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+        <div class="rvos-modal" role="dialog" aria-modal="true">
           <button type="button" class="rvos-modal__close" data-action="close-write" aria-label="Close">&times;</button>
           <div class="rvos-success">
             <div class="rvos-success__icon">&#10003;</div>
@@ -43,7 +43,7 @@ export function renderWriteModal(state: WidgetState): string {
 
   return `
     <div class="rvos-modal-overlay" data-action="close-write">
-      <div class="rvos-modal" role="dialog" aria-modal="true" onclick="event.stopPropagation()">
+      <div class="rvos-modal" role="dialog" aria-modal="true">
         <button type="button" class="rvos-modal__close" data-action="close-write" aria-label="Close">&times;</button>
         <h3 class="rvos-modal__title">Write a review</h3>
         <form data-action="submit-write" class="rvos-form">
