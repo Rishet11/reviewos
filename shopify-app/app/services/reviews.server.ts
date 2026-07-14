@@ -1,4 +1,7 @@
 import { prisma } from "./db.server";
+import { REVIEW_STATUSES, type ReviewStatus } from "./review-status";
+
+export { REVIEW_STATUSES, type ReviewStatus };
 
 export type ReviewSort = "recent" | "helpful" | "rating_desc" | "rating_asc";
 
@@ -173,9 +176,8 @@ export async function voteHelpful(reviewId: string) {
 }
 
 // ---- Admin moderation (merchant-facing, framework-free) ----
-
-export const REVIEW_STATUSES = ["pending", "approved", "rejected"] as const;
-export type ReviewStatus = (typeof REVIEW_STATUSES)[number];
+// REVIEW_STATUSES / ReviewStatus live in ./review-status (client-safe) and are
+// re-exported at the top of this file.
 
 export type ListReviewsForAdminArgs = {
   status?: string;

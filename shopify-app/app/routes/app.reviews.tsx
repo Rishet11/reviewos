@@ -10,13 +10,12 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { prisma } from "../services/db.server";
 import {
-  REVIEW_STATUSES,
   createReview,
   listReviewsForAdmin,
   moderateReview,
   replyToReview,
-  type ReviewStatus,
 } from "../services/reviews.server";
+import { REVIEW_STATUSES, type ReviewStatus } from "../services/review-status";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   await authenticate.admin(request);

@@ -16,6 +16,12 @@ Read this before making changes. Every item here cost real debugging time.
 
 5. **Prisma cannot switch datasource provider per environment.** "SQLite in dev, Postgres in prod" is not a real option with one schema. We moved everything (local dev included) to Neon Postgres. Old sqlite migrations were deleted; schema is managed with `prisma db push` + seed. If migration history is needed later, re-baseline on Postgres.
 
+## Shopify app / React Router traps (Phase 2, 2026-07-14)
+
+21. **A `.server` module's runtime VALUE must never be imported into a route's client component.** React Router strips server code only from `loader`/`action`/`middleware`/`headers`. If the default-export component (or a child component in the same file) references a runtime value from a `*.server.ts` module, RR errors "Server-only module referenced by client", the route fails to load, and App Bridge bounces the merchant to the app home. `typeof x` type queries are fine (erased); only runtime values break it. Fix: put shared client+server constants/enums in a plain (non-`.server`) module with no Prisma import. Caught only by `shopify app dev`/`npm run build`, NOT by `tsc`/typecheck. Bit us on `REVIEW_STATUSES` in `app.reviews.tsx`; will recur in Phase 3 proxy/widget routes.
+22. **This template uses Polaris WEB COMPONENTS (`s-page`, `s-badge`, `s-select`, `s-text-area`, ...), not React `@shopify/polaris`.** No `@shopify/polaris` dep exists. Unknown `s-*` attributes fail silently (don't throw); use the `shopify-polaris-app-home` skill's component list for valid tags/props.
+23. **iCloud-synced `~/Desktop` creates `<name> 2/` duplicate dirs on sync conflicts.** One appeared inside `prisma/migrations/` (empty, untracked) and broke `prisma migrate deploy` with P3015 ("could not find migration.sql"). These won't show in `git status` (untracked/ignored) — check the raw filesystem when a tool complains about a file/dir you didn't create.
+
 ## Ops / deploy traps
 
 6. **Piping a secret into `vercel env add` leaves a trailing newline in the value.** Every Groq fetch then threw `TypeError: Headers ...` and the API 500'd. Use `printf '%s'`, never `echo | `.
