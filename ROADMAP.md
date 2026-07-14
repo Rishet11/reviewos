@@ -9,15 +9,15 @@ Stakeholder-facing demo with zero Shopify dependency; everything portable into t
 - D5 Polish + deploy (Vercel/Render free). Exit: shareable URL.
 Then: stakeholder feedback → Phase 0 (Shopify) with port map recorded in STATE.md.
 
-## Phase 0 — Setup (user actions, blocks everything)
-- [ ] Shopify dev account + development store (Dev Dashboard).
-- [ ] Anthropic API key → `.env`.
-- [x] Node 20.10+ (have v26.5), Shopify CLI (installed 4.5.0).
-Exit: `shopify auth login` works; dev store exists.
+## Phase 0 — Setup (user actions, blocks everything) — DONE
+- [x] Shopify dev account (rishetmehra11@gmail.com, org "ReviewOS") + development store (reviewos.myshopify.com, password `imefru`).
+- [ ] Anthropic API key → `.env` (not obtained; only needed at Phase 4, and demo uses Groq — decide Groq vs Anthropic then).
+- [x] Node 20.10+ (have v26.5), Shopify CLI (4.5.0).
+Exit: `shopify auth login` works; dev store exists. ✔
 
-## Phase 1 — Scaffold & walking skeleton
-`shopify app init` (React Router template) → `shopify app dev` → installed on dev store; embedded admin renders; one hello-world theme app block visible on storefront; one App Proxy route returns JSON.
-Exit: screenshot of admin + block on product page.
+## Phase 1 — Scaffold & walking skeleton — DONE (2026-07-14)
+`shopify app init` (React Router 7 template) → `shopify app dev` → installed on dev store; embedded admin renders; hello-world theme app block visible on product page; App Proxy `/apps/reviewos/status` returns JSON. Lives in `shopify-app/`. Verified live (admin screenshot, block on product page, curl 200 JSON). Committed on branch `phase-1-shopify-skeleton`.
+Exit: screenshot of admin + block on product page. ✔
 
 ## Phase 2 — Review core (data + admin)
 Prisma models (Review, ReviewMedia, AttributeDefinition, MarketplaceSource/Stat/Review, AiSummary, Settings); services in `app/services/`; moderation queue + attribute manager + settings in Polaris admin; seed script.
