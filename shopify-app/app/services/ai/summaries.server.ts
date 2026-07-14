@@ -31,26 +31,27 @@ export function shouldRefresh(currentCount: number, countAtGeneration: number): 
 }
 
 export async function getOrGenerateSummary(
+  shop: string,
   productId: string,
   scope: SummaryScope,
   filters: Record<string, string> = {},
   force = false
 ): Promise<PublicAiSummary | null> {
   const cohortKey = scope === "overall" ? "" : canonicalCohortKey(filters);
-  const reviews = await getApprovedReviewsForCohort(productId, filters);
+  const reviews = await getApprovedReviewsForCohort(shop, productId, filters);
   const reviewCount = reviews.length;
 
   if (reviewCount < MIN_REVIEWS_TO_GENERATE) return null;
 
   const cached = await prisma.aiSummary.findUnique({
-    where: { productId_scope_cohortKey: { productId, scope, cohortKey } },
+    where: { shop_productId_scope_cohortKey: { shop, productId, scope, cohortKey } },
   });
 
   if (cached && !force && !shouldRefresh(reviewCount, cached.reviewCountAtGeneration)) {
     return toPublic(cached, scope, cohortKey, reviewCount);
   }
 
-  const product = await prisma.product.findUnique({ where: { id: productId } });
+  const product = await prisma.product.findFirst({ where: { id: productId, shop } });
   if (!product) return null;
 
   console.log(`[ai] generating summary product=${product.slug} scope=${scope} cohort="${cohortKey}" reviews=${reviewCount}`);
@@ -63,8 +64,9 @@ export async function getOrGenerateSummary(
   });
 
   const saved = await prisma.aiSummary.upsert({
-    where: { productId_scope_cohortKey: { productId, scope, cohortKey } },
+    where: { shop_productId_scope_cohortKey: { shop, productId, scope, cohortKey } },
     create: {
+      shop,
       productId,
       scope,
       cohortKey,

@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { filterReviews } from "./reviews.server";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { prisma } from "./db.server";
+import {
+  createReview,
+  filterReviews,
+  listReviews,
+  listReviewsForAdmin,
+} from "./reviews.server";
 import { canonicalCohortKey, shouldRefresh } from "./ai/summaries.server";
 
 // Pure (no-DB) service logic. DB-touching functions are covered by the
@@ -72,5 +78,79 @@ describe("filterReviews", () => {
     const reviews = [{ rating: 5, attributes: "not json" }];
     expect(filterReviews(reviews, {})).toHaveLength(1);
     expect(filterReviews(reviews, { skinType: "oily" })).toHaveLength(0);
+  });
+});
+
+// ---- Cross-shop isolation (hits the real dev DB via DATABASE_URL) ----
+// Two shops each get their own product + reviews; listing/moderation for one
+// shop must never leak the other shop's rows.
+describe("cross-shop isolation", () => {
+  const SHOP_A = "shop-a-isolation-test.myshopify.com";
+  const SHOP_B = "shop-b-isolation-test.myshopify.com";
+
+  let productA: { id: string };
+  let productB: { id: string };
+
+  beforeAll(async () => {
+    productA = await prisma.product.create({
+      data: {
+        shop: SHOP_A,
+        slug: "isolation-test-product",
+        name: "Isolation Test Product A",
+        category: "test",
+        description: "test",
+        price: 100,
+        imageUrl: "https://example.com/a.png",
+      },
+    });
+    productB = await prisma.product.create({
+      data: {
+        shop: SHOP_B,
+        slug: "isolation-test-product",
+        name: "Isolation Test Product B",
+        category: "test",
+        description: "test",
+        price: 100,
+        imageUrl: "https://example.com/b.png",
+      },
+    });
+
+    await createReview(SHOP_A, {
+      productId: productA.id,
+      customerName: "Shop A Customer",
+      rating: 5,
+      body: "great for shop A",
+      status: "approved",
+    });
+    await createReview(SHOP_B, {
+      productId: productB.id,
+      customerName: "Shop B Customer",
+      rating: 1,
+      body: "terrible for shop B",
+      status: "approved",
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.review.deleteMany({ where: { shop: { in: [SHOP_A, SHOP_B] } } });
+    await prisma.product.deleteMany({ where: { shop: { in: [SHOP_A, SHOP_B] } } });
+  });
+
+  it("public listReviews for shop A never returns shop B reviews", async () => {
+    const { reviews } = await listReviews(SHOP_A, { productSlug: "isolation-test-product" });
+    expect(reviews.length).toBeGreaterThan(0);
+    expect(reviews.every((r) => r.customerName === "Shop A Customer")).toBe(true);
+  });
+
+  it("admin listReviewsForAdmin for shop A never returns shop B reviews", async () => {
+    const { reviews } = await listReviewsForAdmin(SHOP_A);
+    expect(reviews.some((r) => r.customerName === "Shop B Customer")).toBe(false);
+    expect(reviews.some((r) => r.customerName === "Shop A Customer")).toBe(true);
+  });
+
+  it("admin listReviewsForAdmin for shop B never returns shop A reviews", async () => {
+    const { reviews } = await listReviewsForAdmin(SHOP_B);
+    expect(reviews.some((r) => r.customerName === "Shop A Customer")).toBe(false);
+    expect(reviews.some((r) => r.customerName === "Shop B Customer")).toBe(true);
   });
 });

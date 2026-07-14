@@ -16,20 +16,22 @@ import {
   replyToReview,
 } from "../services/reviews.server";
 import { REVIEW_STATUSES, type ReviewStatus } from "../services/review-status";
+import { getOrGenerateSummary } from "../services/ai/summaries.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status") ?? "";
   const productId = url.searchParams.get("productId") ?? "";
 
-  const { reviews, total } = await listReviewsForAdmin({
+  const { reviews, total } = await listReviewsForAdmin(session.shop, {
     status: status || undefined,
     productId: productId || undefined,
   });
 
   const products = await prisma.product.findMany({
+    where: { shop: session.shop },
     select: { id: true, name: true, slug: true, category: true },
     orderBy: { name: "asc" },
   });
@@ -38,7 +40,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   const form = await request.formData();
   const intent = String(form.get("intent"));
@@ -50,15 +52,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (!REVIEW_STATUSES.includes(status as ReviewStatus)) {
         return { error: `Invalid status: ${status}` };
       }
-      const updated = await moderateReview(reviewId, status);
+      const updated = await moderateReview(session.shop, reviewId, status);
       if (!updated) return { error: "Review not found" };
       return { ok: true };
     }
     case "reply": {
       const reviewId = String(form.get("reviewId"));
       const reply = String(form.get("reply") ?? "");
-      const updated = await replyToReview(reviewId, reply);
+      const updated = await replyToReview(session.shop, reviewId, reply);
       if (!updated) return { error: "Review not found" };
+      return { ok: true };
+    }
+    case "regenerate-summary": {
+      const productId = String(form.get("productId"));
+      if (!productId) return { error: "Missing productId" };
+      await getOrGenerateSummary(session.shop, productId, "overall", {}, true);
       return { ok: true };
     }
     case "create": {
@@ -72,7 +80,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return { error: "Missing required fields" };
       }
 
-      await createReview({
+      await createReview(session.shop, {
         productId,
         customerName,
         rating,
@@ -208,7 +216,18 @@ export default function Reviews() {
   const [, setSearchParams] = useSearchParams();
   const moderateFetcher = useFetcher<typeof action>();
   const createFetcher = useFetcher<typeof action>();
+  const summaryFetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
+
+  useEffect(() => {
+    if (
+      summaryFetcher.data &&
+      "ok" in summaryFetcher.data &&
+      summaryFetcher.data.ok
+    ) {
+      shopify.toast.show("AI summary regenerated");
+    }
+  }, [summaryFetcher.data, shopify]);
 
   useEffect(() => {
     if (
@@ -290,6 +309,29 @@ export default function Reviews() {
             />
           ))}
         </s-stack>
+      </s-section>
+
+      <s-section slot="aside" heading="AI summary">
+        <summaryFetcher.Form method="post">
+          <input type="hidden" name="intent" value="regenerate-summary" />
+          <s-stack direction="block" gap="base">
+            <s-select label="Product" name="productId" required>
+              <s-option value="">Select a product</s-option>
+              {products.map((p) => (
+                <s-option key={p.id} value={p.id}>
+                  {p.name}
+                </s-option>
+              ))}
+            </s-select>
+            <s-button
+              variant="secondary"
+              type="submit"
+              {...(summaryFetcher.state !== "idle" ? { loading: true } : {})}
+            >
+              Regenerate AI summary
+            </s-button>
+          </s-stack>
+        </summaryFetcher.Form>
       </s-section>
 
       <s-section slot="aside" heading="New review">

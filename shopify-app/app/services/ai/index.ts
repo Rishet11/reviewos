@@ -6,7 +6,7 @@ const PROVIDERS: Record<string, AiProvider> = {
 };
 
 export function getAiProvider(): AiProvider {
-  const key = process.env.AI_PROVIDER ?? "groq";
+  const key = process.env.AI_PROVIDER || "groq";
   const provider = PROVIDERS[key];
   if (!provider) throw new Error(`unknown AI_PROVIDER: ${key}`);
   return provider;

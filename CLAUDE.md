@@ -13,7 +13,7 @@ Commercial Shopify app (not a demo): AI-first product reviews with filter-aware 
 - Portability rules: business logic only in `app/services/*`; widget is a framework-free embeddable JS+CSS bundle (`widget/`) rendering into `<div data-reviewos>`; `/api/*` JSON contracts identical to future App Proxy routes. Nothing Shopify-specific inside services or widget.
 - Prisma; SQLite in dev, Postgres in prod.
 - Shopify app (Phase 0+): official React Router 7 template, embedded admin (Polaris), Theme App Extension blocks, data via App Proxy.
-- AI: provider-pluggable in `app/services/ai/`; default **Groq** (`GROQ_API_KEY`, OpenAI-compatible API, free tier; cache summaries in DB, never generate per-page-load). Anthropic swappable later via env.
+- AI: **Groq only** (`GROQ_API_KEY`, OpenAI-compatible API, free tier; cache summaries in DB, never generate per-page-load). Registry in `app/services/ai/` stays pluggable but only `groq` is registered — do NOT add Anthropic. Env var may be present-but-empty, so resolve with `|| "groq"`, never `?? "groq"` (LEARNINGS #29).
 - No hardcoding of categories or filters — merchant-defined attributes drive everything.
 
 ## Orchestration policy

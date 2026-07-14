@@ -9,3 +9,12 @@ reviewos/prisma/dev.db-journal
 reviewos/prisma/prisma/
 dist/
 *.log
+
+# generated / local
+graphify-out/
+**/graphify-out/
+reviewos/prisma/*.sqlite
+docs/*_convert.pdf
+reviewos/.claude/
+reviewos/.agents/
+reviewos/skills-lock.json

@@ -1,8 +1,8 @@
 import { prisma } from "./db.server";
 
-export async function getMarketplaceStats(productSlug: string) {
+export async function getMarketplaceStats(shop: string, productSlug: string) {
   const product = await prisma.product.findUnique({
-    where: { slug: productSlug },
+    where: { shop_slug: { shop, slug: productSlug } },
   });
 
   if (!product) {
@@ -10,7 +10,7 @@ export async function getMarketplaceStats(productSlug: string) {
   }
 
   const stats = await prisma.marketplaceStat.findMany({
-    where: { productId: product.id },
+    where: { shop, productId: product.id },
     include: { source: true },
   });
 

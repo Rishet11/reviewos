@@ -29,12 +29,12 @@ Entry check: verify on shopify.dev that multiple app blocks coexist on one produ
 App blocks: review-feed, rating-distribution, star-badge, write-review (attribute-driven form), filter-chips (dynamic, URL-synced). App Proxy endpoints with pagination/filtering. Scoped CSS, schema settings per block.
 Exit: full submit→moderate→display loop on dev store; blocks reorder/configure in Theme Editor.
 
-## Phase 4 — AI service
-Anthropic integration: overall summary, cohort (filter-aware) summaries, tag/sentiment extraction; caching + min-review threshold; in-process job queue for dev phases (decision: BullMQ+Redis deferred to Phase 8); ai-summary block; demo-review generator behind a dev flag.
-Exit: summary appears, changes when filter chips change, regenerates on new approval.
+## Phase 4 — Product linkage + AI service — DONE (2026-07-15), pending live theme-editor check
+Real product linkage: `Product.slug = Shopify handle` via catalog sync (`syncProductsFromCatalog`) + auto-create on unknown handle (`resolveProductForShop`), GID stored for future metafield writeback. AI (Groq, provider-pluggable; Anthropic swappable later): overall + cohort (filter-aware) summaries, DB caching + min-review (3) threshold, `force` regen; ai-summary block wired (refetch on filter change, hide when null); admin regenerate control + products sync page. Merchant-facing "review generation" = AI condensation of real reviews; `fabricateReviews` stays dev-flag-only, never merchant-facing (FTC + Shopify 1.3). Deferred within Phase 4: tag/sentiment extraction, in-process job queue (BullMQ+Redis → Phase 8), `reviews.rating` metafield writeback (GID column added to enable it).
+Exit: summary appears, changes when filter chips change, regenerates on demand. (Code verified: typecheck/vitest/build green. Live theme-editor confirmation outstanding.)
 
 ## Phase 5 — Marketplace aggregation (merchant-owned data)
-Marketplace manager admin (manual stats entry + CSV review import for Amazon/Flipkart/Nykaa/Smytten exports), marketplace-ratings trust-badge block, per-marketplace AI summaries, ugc-gallery block with lightbox.
+Marketplace manager admin (manual stats entry + CSV review import for Amazon/Flipkart/Nykaa/Smytten exports), marketplace-ratings trust-badge block, per-marketplace AI summaries, ugc-gallery block with lightbox. URL-mapping model: merchant maps a marketplace product URL to a Shopify product once; stored on `MarketplaceSource.externalUrl`. Pluggable `MarketplaceConnector` interface for swappable fetch backend: CSV import in v1, URL-paste or licensed API with merchant-supplied (BYO) key later. Note: no own-infrastructure bulk scraping in any App Store submission build.
 Exit: marketplace badges + "What Amazon customers say" live on storefront from imported data.
 
 ## Phase 5b — Marketplace live-fetch connector (optional, flag-gated)
@@ -43,7 +43,7 @@ Not included in App Store submission builds; post-approval opt-in only (see PRD 
 Exit: with a provider key entered via the admin settings UI (stored per-shop) and the shop flag on, marketplace data populates for a test product without CSV; flag off hides the connector entirely.
 
 ## Phase 6 — Media & collection
-R2 (or Shopify Files) photo/video upload on write-review; post-purchase review-request email with verified deep link; verified-buyer badge from order linkage.
+R2 (or Shopify Files) photo/video upload on write-review; post-purchase review-request email with verified deep link; verified-buyer badge from order linkage. Review-request email: default timing 3-5 days post-delivery with purchase-recency cohort triggers, max 3 touches per customer. WhatsApp review requests via merchant-authenticated WhatsApp Business API as v1.1; SMS after that.
 - [ ] [USER] Place a test order on the dev store (needed for verified-buyer + review-request email tests).
 Exit: photo review submitted from storefront displays in gallery; request email fires on test order.
 

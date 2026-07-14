@@ -33,3 +33,10 @@
 
 ## AI
 - Decision 2026-07-14: **Groq** (free tier, OpenAI-compatible chat completions API) for summaries/sentiment/generation; key via `.env` `GROQ_API_KEY`. Free-tier rate limits are tight → summaries are cached in DB and generated on demand only, never per-page-load. Provider interface keeps Anthropic (`claude-haiku-4-5`) as a drop-in swap for production scale.
+
+## 2026-07-15 — Marketplace import precedent + collection channels (verified via web research)
+- URL-paste Amazon review importers live on App Store with no documented takedowns: Opinew (https://apps.shopify.com/photo-reviews, $19+), Areviews (https://apps.shopify.com/areviews-aliexpress, $6.99+), Reputon, K: Amazon Reviews Importer (https://apps.shopify.com/k-amazon-reviews, free). Shopify requirement 1.3 bans incentivized/fake reviews, not imports (https://shopify.dev/changelog/updated-app-store-requirements-13-always-use-honest-and-transparent-review-practices).
+- Amazon hardening May 2026: logged-out /product-reviews/ pages blocked, review text stripped from product HTML; approximately 100-review visibility cap (https://amazonscraperapi.com/blog/is-scraping-amazon-legal). Scraping remains a civil ToS risk; softens but does not overturn the earlier "no compliant scraping path" verdict for own-infrastructure scraping.
+- No Shopify review app sends native WhatsApp review requests; Judge.me routes via Klaviyo (https://judge.me/help/en/articles/8259593-sending-review-requests-via-klaviyo). WhatsApp Business API utility templates cost approximately USD 0.001-0.002 per message (approximately INR 0.08-0.15 in India), require Meta template approval via a Business Solution Provider (https://blueticks.co/blog/whatsapp-business-api-pricing-2026).
+- Competitor AI paywalls: Judge.me $15, Fera $39, Okendo $119, Yotpo $169, Stamped $199/mo; Okendo leads customization with 7 widget types / 18 layouts (https://okendo.io/pricing/, https://judge.me/pricing).
+- Email review-request best practice: 3-5 days post-delivery vs competitor defaults of 7-14 days (https://studioniza.com/journal/best-time-send-review-request-shopify/).

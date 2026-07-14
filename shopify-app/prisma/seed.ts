@@ -7,6 +7,8 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const SHOP = process.env.SHOP_DOMAIN ?? "reviewos-dev.myshopify.com";
+
 function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -57,19 +59,20 @@ const NAMES = [...INDIAN_NAMES, ...INTL_NAMES];
 const SOURCES = ["website", "amazon", "flipkart", "nykaa", "smytten", "generated"];
 
 async function main() {
-  // Clean slate for repeatable seeding.
-  await prisma.marketplaceStat.deleteMany();
-  await prisma.marketplaceSource.deleteMany();
-  await prisma.reviewMedia.deleteMany();
-  await prisma.review.deleteMany();
-  await prisma.attributeDefinition.deleteMany();
-  await prisma.aiSummary.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.settings.deleteMany();
+  // Clean slate for repeatable seeding (scoped to this shop only).
+  await prisma.marketplaceStat.deleteMany({ where: { shop: SHOP } });
+  await prisma.marketplaceSource.deleteMany({ where: { shop: SHOP } });
+  await prisma.reviewMedia.deleteMany({ where: { review: { shop: SHOP } } });
+  await prisma.review.deleteMany({ where: { shop: SHOP } });
+  await prisma.attributeDefinition.deleteMany({ where: { shop: SHOP } });
+  await prisma.aiSummary.deleteMany({ where: { shop: SHOP } });
+  await prisma.product.deleteMany({ where: { shop: SHOP } });
+  await prisma.settings.deleteMany({ where: { shop: SHOP } });
 
   // --- Products ---
   const serum = await prisma.product.create({
     data: {
+      shop: SHOP,
       slug: "glow-lab-vitamin-c-serum",
       name: "Glow Lab Vitamin C Serum",
       category: "skincare",
@@ -82,6 +85,7 @@ async function main() {
 
   const shoes = await prisma.product.create({
     data: {
+      shop: SHOP,
       slug: "stridewear-airflex-running-shoes",
       name: "StrideWear AirFlex Running Shoes",
       category: "shoes",
@@ -94,6 +98,7 @@ async function main() {
 
   const earbuds = await prisma.product.create({
     data: {
+      shop: SHOP,
       slug: "boat-airbeat-pro-earbuds",
       name: "boAt AirBeat Pro Wireless Earbuds",
       category: "earbuds",
@@ -108,42 +113,49 @@ async function main() {
   await prisma.attributeDefinition.createMany({
     data: [
       {
+        shop: SHOP,
         productCategory: "skincare",
         key: "skinType",
         label: "Skin Type",
         options: JSON.stringify(["dry", "oily", "combination", "sensitive"]),
       },
       {
+        shop: SHOP,
         productCategory: "skincare",
         key: "ageRange",
         label: "Age Range",
         options: JSON.stringify(["18-24", "25-34", "35-44", "45+"]),
       },
       {
+        shop: SHOP,
         productCategory: "skincare",
         key: "usageDuration",
         label: "Usage Duration",
         options: JSON.stringify(["under 1 month", "1-3 months", "3-6 months", "6+ months"]),
       },
       {
+        shop: SHOP,
         productCategory: "shoes",
         key: "useCase",
         label: "Use Case",
         options: JSON.stringify(["daily jogging", "long distance", "gym training", "casual wear"]),
       },
       {
+        shop: SHOP,
         productCategory: "shoes",
         key: "fit",
         label: "Fit",
         options: JSON.stringify(["runs small", "true to size", "runs large"]),
       },
       {
+        shop: SHOP,
         productCategory: "earbuds",
         key: "useCase",
         label: "Use Case",
         options: JSON.stringify(["commute", "gym", "work calls", "gaming"]),
       },
       {
+        shop: SHOP,
         productCategory: "earbuds",
         key: "priority",
         label: "Top Priority",
@@ -154,28 +166,28 @@ async function main() {
 
   // --- Marketplace sources ---
   const amazon = await prisma.marketplaceSource.create({
-    data: { name: "Amazon", logoUrl: "https://logo.clearbit.com/amazon.in", baseUrl: "https://www.amazon.in" },
+    data: { shop: SHOP, name: "Amazon", logoUrl: "https://logo.clearbit.com/amazon.in", baseUrl: "https://www.amazon.in" },
   });
   const flipkart = await prisma.marketplaceSource.create({
-    data: { name: "Flipkart", logoUrl: "https://logo.clearbit.com/flipkart.com", baseUrl: "https://www.flipkart.com" },
+    data: { shop: SHOP, name: "Flipkart", logoUrl: "https://logo.clearbit.com/flipkart.com", baseUrl: "https://www.flipkart.com" },
   });
   const nykaa = await prisma.marketplaceSource.create({
-    data: { name: "Nykaa", logoUrl: "https://logo.clearbit.com/nykaa.com", baseUrl: "https://www.nykaa.com" },
+    data: { shop: SHOP, name: "Nykaa", logoUrl: "https://logo.clearbit.com/nykaa.com", baseUrl: "https://www.nykaa.com" },
   });
   const smytten = await prisma.marketplaceSource.create({
-    data: { name: "Smytten", logoUrl: "https://logo.clearbit.com/smytten.com", baseUrl: "https://www.smytten.com" },
+    data: { shop: SHOP, name: "Smytten", logoUrl: "https://logo.clearbit.com/smytten.com", baseUrl: "https://www.smytten.com" },
   });
 
   // --- Marketplace stats ---
   await prisma.marketplaceStat.createMany({
     data: [
-      { productId: serum.id, sourceId: amazon.id, rating: 4.3, reviewCount: 812, url: "https://www.amazon.in/dp/glow-lab-serum" },
-      { productId: serum.id, sourceId: nykaa.id, rating: 4.5, reviewCount: 431, url: "https://www.nykaa.com/glow-lab-serum" },
-      { productId: serum.id, sourceId: smytten.id, rating: 4.2, reviewCount: 96, url: "https://www.smytten.com/glow-lab-serum" },
-      { productId: shoes.id, sourceId: amazon.id, rating: 4.1, reviewCount: 1204, url: "https://www.amazon.in/dp/stridewear-shoes" },
-      { productId: shoes.id, sourceId: flipkart.id, rating: 4.0, reviewCount: 967, url: "https://www.flipkart.com/stridewear-shoes" },
-      { productId: earbuds.id, sourceId: amazon.id, rating: 4.4, reviewCount: 2310, url: "https://www.amazon.in/dp/boat-airbeat-pro" },
-      { productId: earbuds.id, sourceId: flipkart.id, rating: 4.3, reviewCount: 1780, url: "https://www.flipkart.com/boat-airbeat-pro" },
+      { shop: SHOP, productId: serum.id, sourceId: amazon.id, rating: 4.3, reviewCount: 812, url: "https://www.amazon.in/dp/glow-lab-serum" },
+      { shop: SHOP, productId: serum.id, sourceId: nykaa.id, rating: 4.5, reviewCount: 431, url: "https://www.nykaa.com/glow-lab-serum" },
+      { shop: SHOP, productId: serum.id, sourceId: smytten.id, rating: 4.2, reviewCount: 96, url: "https://www.smytten.com/glow-lab-serum" },
+      { shop: SHOP, productId: shoes.id, sourceId: amazon.id, rating: 4.1, reviewCount: 1204, url: "https://www.amazon.in/dp/stridewear-shoes" },
+      { shop: SHOP, productId: shoes.id, sourceId: flipkart.id, rating: 4.0, reviewCount: 967, url: "https://www.flipkart.com/stridewear-shoes" },
+      { shop: SHOP, productId: earbuds.id, sourceId: amazon.id, rating: 4.4, reviewCount: 2310, url: "https://www.amazon.in/dp/boat-airbeat-pro" },
+      { shop: SHOP, productId: earbuds.id, sourceId: flipkart.id, rating: 4.3, reviewCount: 1780, url: "https://www.flipkart.com/boat-airbeat-pro" },
     ],
   });
 
@@ -302,6 +314,7 @@ async function createSeedReview(
 
   const review = await prisma.review.create({
     data: {
+      shop: SHOP,
       productId,
       customerName: pick(NAMES),
       customerEmail: Math.random() < 0.5 ? `customer${index}@example.com` : null,

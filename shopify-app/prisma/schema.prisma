@@ -34,25 +34,34 @@ model Session {
 // JSON-ish fields (attributes, options, pros, cons) stay String and are
 // JSON.parse'd in services (drop-in port from the demo). Category-agnostic:
 // attribute keys/labels/options are merchant-defined data, never code.
+// Multi-tenant: every domain model is scoped by `shop` (Shopify shop domain).
+// Uniqueness constraints that would otherwise collide across shops are
+// scoped to [shop, ...].
 
 model Product {
   id          String   @id @default(cuid())
-  slug        String   @unique
+  shop        String
+  slug        String
   name        String
   category    String
   description String
   price       Int
   imageUrl    String
+  shopifyProductId String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   reviews          Review[]
   marketplaceStats MarketplaceStat[]
   aiSummaries      AiSummary[]
+
+  @@unique([shop, slug])
+  @@index([shop])
 }
 
 model Review {
   id                  String    @id @default(cuid())
+  shop                String
   productId           String
   product             Product   @relation(fields: [productId], references: [id])
   customerName        String
@@ -71,6 +80,9 @@ model Review {
   media               ReviewMedia[]
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+
+  @@index([shop])
+  @@index([shop, productId, status])
 }
 
 model ReviewMedia {
@@ -85,6 +97,7 @@ model ReviewMedia {
 
 model AttributeDefinition {
   id              String   @id @default(cuid())
+  shop            String
   productCategory String
   key             String
   label           String
@@ -93,22 +106,28 @@ model AttributeDefinition {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([productCategory, key])
+  @@unique([shop, productCategory, key])
+  @@index([shop])
 }
 
 model MarketplaceSource {
   id        String   @id @default(cuid())
-  name      String   @unique
+  shop      String
+  name      String
   logoUrl   String
   baseUrl   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   stats MarketplaceStat[]
+
+  @@unique([shop, name])
+  @@index([shop])
 }
 
 model MarketplaceStat {
   id          String            @id @default(cuid())
+  shop        String
   productId   String
   product     Product           @relation(fields: [productId], references: [id])
   sourceId    String
@@ -119,11 +138,13 @@ model MarketplaceStat {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 
-  @@unique([productId, sourceId])
+  @@unique([shop, productId, sourceId])
+  @@index([shop])
 }
 
 model AiSummary {
   id                     String   @id @default(cuid())
+  shop                   String
   productId              String
   product                Product  @relation(fields: [productId], references: [id])
   scope                  String
@@ -135,13 +156,18 @@ model AiSummary {
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 
-  @@unique([productId, scope, cohortKey])
+  @@unique([shop, productId, scope, cohortKey])
+  @@index([shop])
 }
 
 model Settings {
   id        String   @id @default(cuid())
-  key       String   @unique
+  shop      String
+  key       String
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([shop, key])
+  @@index([shop])
 }

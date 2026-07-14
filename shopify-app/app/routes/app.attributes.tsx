@@ -17,10 +17,11 @@ import {
 } from "../services/attributes.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
-  const definitions = await listAttributeDefinitions();
+  const definitions = await listAttributeDefinitions(session.shop);
   const categoryRows = await prisma.product.findMany({
+    where: { shop: session.shop },
     select: { category: true },
     distinct: ["category"],
   });
@@ -48,7 +49,7 @@ function isUniqueViolation(e: unknown): boolean {
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   const form = await request.formData();
   const intent = String(form.get("intent"));
@@ -66,7 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       try {
-        await createAttributeDefinition({
+        await createAttributeDefinition(session.shop, {
           productCategory,
           key,
           label,
@@ -94,13 +95,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       try {
-        await updateAttributeDefinition(id, {
+        const updated = await updateAttributeDefinition(session.shop, id, {
           productCategory,
           key,
           label,
           options,
           display,
         });
+        if (!updated) return { error: "Attribute not found" };
       } catch (e) {
         if (isUniqueViolation(e)) {
           return { error: `An attribute "${key}" already exists for category "${productCategory}"` };
@@ -111,7 +113,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     case "attr-delete": {
       const id = String(form.get("id"));
-      await deleteAttributeDefinition(id);
+      const deleted = await deleteAttributeDefinition(session.shop, id);
+      if (!deleted) return { error: "Attribute not found" };
       return { ok: true };
     }
     default:

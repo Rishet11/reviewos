@@ -1,12 +1,14 @@
 import type { LoaderFunctionArgs } from "react-router";
+import { requireProxy } from "../lib/proxy-verify.server";
 
-// TODO: Shopify signs proxy requests with a `signature` query param;
-// production code must verify it before trusting the request.
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { shop } = requireProxy(request);
+
   return Response.json({
     ok: true,
     app: "reviewos",
     route: "app-proxy",
     path: "/apps/reviewos/status",
+    shop,
   });
 };

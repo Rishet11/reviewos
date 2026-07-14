@@ -11,14 +11,14 @@ import { authenticate } from "../shopify.server";
 import { getAllSettings, setSetting } from "../services/settings.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
-  const settings = await getAllSettings();
+  const settings = await getAllSettings(session.shop);
   return { settings };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   const form = await request.formData();
   const intent = String(form.get("intent"));
@@ -28,7 +28,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const key = String(form.get("key") ?? "").trim();
       const value = String(form.get("value") ?? "");
       if (!key) return { error: "Key is required" };
-      await setSetting(key, value);
+      await setSetting(session.shop, key, value);
       return { ok: true };
     }
     default:

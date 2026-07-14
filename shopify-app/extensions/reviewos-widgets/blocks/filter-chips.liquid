@@ -1,0 +1,22 @@
+{% render 'reviewos-assets' %}
+<div
+  class="reviewos"
+  data-reviewos
+  data-block="filter-chips"
+  data-product-id="{{ product.id }}"
+  data-product-handle="{{ product.handle }}"
+  data-api-base="{{ block.settings.api_base }}"
+  style="--reviewos-accent: {{ block.settings.accent_color }};"
+>
+</div>
+
+{% schema %}
+{
+  "name": "ReviewOS: Filter chips",
+  "target": "section",
+  "settings": [
+    { "type": "color", "id": "accent_color", "label": "Accent color", "default": "#1a1a1a" },
+    { "type": "text", "id": "api_base", "label": "API base path", "default": "/apps/reviewos" }
+  ]
+}
+{% endschema %}

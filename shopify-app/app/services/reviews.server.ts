@@ -15,17 +15,20 @@ export type ListReviewsArgs = {
   status?: string;
 };
 
-export async function listReviews({
-  productSlug,
-  filters = {},
-  rating,
-  sort = "recent",
-  page = 1,
-  pageSize = 10,
-  status = "approved",
-}: ListReviewsArgs) {
+export async function listReviews(
+  shop: string,
+  {
+    productSlug,
+    filters = {},
+    rating,
+    sort = "recent",
+    page = 1,
+    pageSize = 10,
+    status = "approved",
+  }: ListReviewsArgs
+) {
   const product = await prisma.product.findUnique({
-    where: { slug: productSlug },
+    where: { shop_slug: { shop, slug: productSlug } },
   });
 
   if (!product) {
@@ -39,7 +42,7 @@ export async function listReviews({
   // production scale this should move to indexed columns, a proper JSON
   // query (Postgres jsonb operators), or a search index.
   const all = await prisma.review.findMany({
-    where: { productId: product.id, status },
+    where: { shop, productId: product.id, status },
     include: { media: true },
   });
 
@@ -74,11 +77,12 @@ export function filterReviews<T extends { rating: number; attributes: string }>(
 // filters, unpaginated. Used by AI summary generation, which needs the full
 // cohort rather than a page of it.
 export async function getApprovedReviewsForCohort(
+  shop: string,
   productId: string,
   filters: Record<string, string>
 ) {
   const all = await prisma.review.findMany({
-    where: { productId, status: "approved" },
+    where: { shop, productId, status: "approved" },
   });
   return filterReviews(all, filters);
 }
@@ -109,9 +113,9 @@ function safeParse(json: string): Record<string, unknown> | null {
   }
 }
 
-export async function getRatingSummary(productSlug: string) {
+export async function getRatingSummary(shop: string, productSlug: string) {
   const product = await prisma.product.findUnique({
-    where: { slug: productSlug },
+    where: { shop_slug: { shop, slug: productSlug } },
   });
 
   if (!product) {
@@ -119,7 +123,7 @@ export async function getRatingSummary(productSlug: string) {
   }
 
   const reviews = await prisma.review.findMany({
-    where: { productId: product.id, status: "approved" },
+    where: { shop, productId: product.id, status: "approved" },
     select: { rating: true },
   });
 
@@ -149,9 +153,10 @@ export type CreateReviewInput = {
   createdAt?: Date;
 };
 
-export async function createReview(data: CreateReviewInput) {
+export async function createReview(shop: string, data: CreateReviewInput) {
   return prisma.review.create({
     data: {
+      shop,
       productId: data.productId,
       customerName: data.customerName,
       customerEmail: data.customerEmail,
@@ -166,13 +171,13 @@ export async function createReview(data: CreateReviewInput) {
   });
 }
 
-export async function voteHelpful(reviewId: string) {
+export async function voteHelpful(shop: string, reviewId: string) {
   const { count } = await prisma.review.updateMany({
-    where: { id: reviewId },
+    where: { id: reviewId, shop },
     data: { helpfulCount: { increment: 1 } },
   });
   if (count === 0) return null;
-  return prisma.review.findUnique({ where: { id: reviewId } });
+  return prisma.review.findFirst({ where: { id: reviewId, shop } });
 }
 
 // ---- Admin moderation (merchant-facing, framework-free) ----
@@ -189,13 +194,11 @@ export type ListReviewsForAdminArgs = {
 // Admin listing: returns reviews of ANY status (unlike the storefront
 // listReviews which defaults to approved-only), newest first, with product +
 // media joined so the moderation table can render context.
-export async function listReviewsForAdmin({
-  status,
-  productId,
-  page = 1,
-  pageSize = 25,
-}: ListReviewsForAdminArgs = {}) {
-  const where: { status?: string; productId?: string } = {};
+export async function listReviewsForAdmin(
+  shop: string,
+  { status, productId, page = 1, pageSize = 25 }: ListReviewsForAdminArgs = {}
+) {
+  const where: { shop: string; status?: string; productId?: string } = { shop };
   if (status) where.status = status;
   if (productId) where.productId = productId;
 
@@ -213,27 +216,27 @@ export async function listReviewsForAdmin({
   return { reviews, total, page, pageSize };
 }
 
-export async function moderateReview(reviewId: string, status: string) {
+export async function moderateReview(shop: string, reviewId: string, status: string) {
   if (!REVIEW_STATUSES.includes(status as ReviewStatus)) {
     throw new Error(`Invalid review status: ${status}`);
   }
   const { count } = await prisma.review.updateMany({
-    where: { id: reviewId },
+    where: { id: reviewId, shop },
     data: { status },
   });
   if (count === 0) return null;
-  return prisma.review.findUnique({ where: { id: reviewId } });
+  return prisma.review.findFirst({ where: { id: reviewId, shop } });
 }
 
-export async function replyToReview(reviewId: string, reply: string) {
+export async function replyToReview(shop: string, reviewId: string, reply: string) {
   const trimmed = reply.trim();
   const { count } = await prisma.review.updateMany({
-    where: { id: reviewId },
+    where: { id: reviewId, shop },
     data: {
       merchantReply: trimmed.length > 0 ? trimmed : null,
       merchantRepliedAt: trimmed.length > 0 ? new Date() : null,
     },
   });
   if (count === 0) return null;
-  return prisma.review.findUnique({ where: { id: reviewId } });
+  return prisma.review.findFirst({ where: { id: reviewId, shop } });
 }

@@ -1,8 +1,8 @@
 import { prisma } from "./db.server";
 
-export async function getAttributeDefinitions(productCategory: string) {
+export async function getAttributeDefinitions(shop: string, productCategory: string) {
   const defs = await prisma.attributeDefinition.findMany({
-    where: { productCategory },
+    where: { shop, productCategory },
     orderBy: { key: "asc" },
   });
 
@@ -33,16 +33,18 @@ export type AttributeDefinitionInput = {
   display?: boolean;
 };
 
-export async function listAttributeDefinitions() {
+export async function listAttributeDefinitions(shop: string) {
   const defs = await prisma.attributeDefinition.findMany({
+    where: { shop },
     orderBy: [{ productCategory: "asc" }, { key: "asc" }],
   });
   return defs.map((def) => ({ ...def, options: safeParseArray(def.options) }));
 }
 
-export async function createAttributeDefinition(input: AttributeDefinitionInput) {
+export async function createAttributeDefinition(shop: string, input: AttributeDefinitionInput) {
   return prisma.attributeDefinition.create({
     data: {
+      shop,
       productCategory: input.productCategory.trim(),
       key: input.key.trim(),
       label: input.label.trim(),
@@ -53,6 +55,7 @@ export async function createAttributeDefinition(input: AttributeDefinitionInput)
 }
 
 export async function updateAttributeDefinition(
+  shop: string,
   id: string,
   patch: Partial<AttributeDefinitionInput>
 ) {
@@ -68,9 +71,16 @@ export async function updateAttributeDefinition(
   if (patch.label !== undefined) data.label = patch.label.trim();
   if (patch.options !== undefined) data.options = JSON.stringify(patch.options);
   if (patch.display !== undefined) data.display = patch.display;
-  return prisma.attributeDefinition.update({ where: { id }, data });
+
+  const { count } = await prisma.attributeDefinition.updateMany({
+    where: { id, shop },
+    data,
+  });
+  if (count === 0) return null;
+  return prisma.attributeDefinition.findFirst({ where: { id, shop } });
 }
 
-export async function deleteAttributeDefinition(id: string) {
-  return prisma.attributeDefinition.delete({ where: { id } });
+export async function deleteAttributeDefinition(shop: string, id: string) {
+  const { count } = await prisma.attributeDefinition.deleteMany({ where: { id, shop } });
+  return count > 0;
 }

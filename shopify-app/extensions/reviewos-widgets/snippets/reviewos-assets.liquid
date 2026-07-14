@@ -1,0 +1,27 @@
+{% comment %}
+  Shared JS/CSS loader for all ReviewOS app blocks. Multiple blocks can sit on
+  one product template, and Online Store 2.0 app blocks render in isolated
+  Liquid scopes (a {% assign %} in one block is not visible to a sibling
+  block), so a Liquid-level "only render once" flag does not work here. This
+  guards at the JS runtime level instead: a window flag that persists across
+  all blocks on the page regardless of Liquid scope. The widget script itself
+  is also idempotent (mount is keyed off DOM state), so even if this guard
+  were bypassed, nothing would double-mount, but this avoids redundant
+  network requests and duplicate DOMContentLoaded listeners.
+{% endcomment %}
+<script>
+  (function () {
+    if (window.__reviewosAssetsLoaded) return;
+    window.__reviewosAssetsLoaded = true;
+
+    var link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "{{ 'reviewos.css' | asset_url }}";
+    document.head.appendChild(link);
+
+    var script = document.createElement("script");
+    script.src = "{{ 'reviewos.js' | asset_url }}";
+    script.defer = true;
+    document.head.appendChild(script);
+  })();
+</script>
