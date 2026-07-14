@@ -1,0 +1,40 @@
+<div class="reviewos-hello">
+  <h3>{{ block.settings.heading }}</h3>
+  {% if product %}
+    <p>Product: {{ product.title }}</p>
+  {% endif %}
+  <p class="reviewos-hello__tag">ReviewOS Theme App Extension (walking skeleton)</p>
+</div>
+
+<style>
+.reviewos-hello {
+  border: 4px dashed #ff00aa;
+  background: #fff0fa;
+  color: #1a1a1a;
+  padding: 16px;
+  border-radius: 8px;
+  font-family: sans-serif;
+}
+
+.reviewos-hello h3 {
+  margin: 0 0 8px;
+  color: #ff00aa;
+}
+
+.reviewos-hello__tag {
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.7;
+}
+</style>
+
+{% schema %}
+{
+  "name": "ReviewOS Hello",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "heading", "label": "Heading", "default": "ReviewOS block live ✅" }
+  ]
+}
+{% endschema %}

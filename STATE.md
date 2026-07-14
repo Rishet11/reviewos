@@ -1,4 +1,4 @@
-# STATE (updated 2026-07-15)
+# STATE (updated 2026-07-14)
 
 ## Done
 - Docs: CLAUDE.md (rules + orchestration policy), PRD.md, ROADMAP.md (Phase D → 0-8), docs/RESEARCH.md (verified facts, cite instead of re-searching).
@@ -11,11 +11,17 @@
 
 - Post-D5 bug sweep (user report "can't see reviews" + parallel QA/audit agents): (1) ROOT CAUSE of missing reviews: widget self-mounted on window.load into a React-owned div; hydration re-render wiped it. Now demo pages mark the host data-reviewos-manual and mount from useEffect via idempotent window.ReviewOS.mount() (DOM-presence guard, ReviewOSQueue for script ordering); plain embeds still auto-mount. 8/8 clean live loads. (2) Write-review modal was fully broken (inline stopPropagation killed delegated clicks: star picker and X dead); replaced with backdrop-only close guard in the delegated handler; full submit flow now works. (3) Filter changes now pushState + popstate restore (Back steps through filters instead of leaving page). (4) API hardening: POST /api/reviews validates rating 1-5/name/body/JSON (400s), helpful-vote 404 on bad id, page/pageSize/rating params clamped. (5) trust-badges onerror rewritten (no JS-in-attribute interpolation), counts toLocaleString, dist-row min-height 36px, lightbox focuses on open. Known accepted gaps: no server-side helpful-vote dedupe, optimistic helpful count not reverted on failure, document keydown/popstate listeners never removed (single mount per page).
 
+- Phase 1 (Shopify walking skeleton, 2026-07-14): official React Router 7 + Polaris app scaffolded into `shopify-app/` via `shopify app init --template reactRouter --flavor typescript` (client_id ce3ba6bc..., app "reviewos", org "ReviewOS", dev store reviewos.myshopify.com). CLI created it at `shopify-app/reviewos/` with its own nested `.git`; flattened to `shopify-app/` and removed the nested repo so the parent tracks it. Three deliverables added + verified LIVE on the dev store:
+  (1) Embedded Polaris admin renders (App Bridge, template default) — verified in-admin screenshot.
+  (2) Theme App Extension `reviewos-hello` (`extensions/reviewos-hello/blocks/hello.liquid`): hello-world app block, target "section", one text setting `heading`, renders `{{ product.title }}`. Verified rendering on the product-template editor preview (pink dashed box, "ReviewOS block live ✅", "Product: Gift Card"). TRAP HIT: app-extension blocks CANNOT use `{% stylesheet %}` (theme-check `AppBlockValidTags`); use inline `<style>`. `shopify app config validate` does NOT catch this — only `shopify app dev`'s theme-check did (LEARNINGS #10 again).
+  (3) App Proxy: `[app_proxy]` in shopify.app.toml (prefix "apps", subpath "reviewos") + RR resource routes `app/routes/proxy.status.tsx` + `proxy._index.tsx`. Verified: `curl https://reviewos.myshopify.com/apps/reviewos/status` → 200 `{"ok":true,"app":"reviewos","route":"app-proxy",...}` (bypassed storefront password via unlock cookie). Path mapping confirmed: `/apps/reviewos/{rest}` → `<proxy_url>/{rest}`; CLI auto-sets proxy_url to `<tunnel>/proxy` at dev runtime (local toml keeps `example.com/proxy` placeholder — deploy will need the real host).
+
 ## In progress
-- Nothing mid-file. Phase D complete.
+- Nothing mid-file. Phase 1 complete; `shopify app dev` was left running (my background) for verification.
 
 ## Next
-- Phase 0 (user actions): Shopify dev account + development store; then Phase 1 scaffold (official React Router template via `shopify app init`, embedded Polaris admin, hello-world theme app block, App Proxy JSON route). See ROADMAP.md.
+- Phase 2 (Review core): port `reviewos/app/services/*` (framework-free, copy nearly as-is) into `shopify-app/app/services/`, add Prisma models, Polaris moderation/attribute/settings admin, seed. See ROADMAP.md. Request Shopify protected-customer-data access when models first touch customer/order data.
+- Port map: widget bundle (`reviewos/public/widget/reviewos.{js,css}`) drops into the Theme App Extension `assets/`; a Liquid block renders `<div data-reviewos ...>` for the non-React AUTO-MOUNT path (keep it working — LEARNINGS #1). `/api/*` JSON contracts become App Proxy routes under `app/routes/proxy.*` (pattern proven this phase).
 - Port map for Phases 2-4: `app/services/*` copy nearly as-is (framework-free); widget bundle drops in as a Theme App Extension asset (non-React embed uses the auto-mount path, keep it working); `/api/*` JSON contracts become App Proxy routes unchanged.
 - Read LEARNINGS.md before changing widget mount, event handling, escaping, URL sync, or deploy config.
 
@@ -25,3 +31,6 @@
 - Widget must mount after React hydration (window.load in widget/src/index.ts) — do not "simplify" back to DOMContentLoaded, it breaks everything silently.
 - Reseed: `npm run seed`. Typecheck: `npm run typecheck`. Playwright is installed for headless verification (screenshots + console errors).
 - Follow CLAUDE.md orchestration policy: delegate builds to sonnet subagents with full cold-start specs, verify their claims yourself, update this file after each milestone.
+- Shopify app: run `cd shopify-app && shopify app dev --store reviewos.myshopify.com`. First run prompts for the STOREFRONT password (dev store is password-protected; password: `imefru`) — this ink prompt CANNOT be automated via expect (neither \r nor \n submits; chars just accumulate). Run `shopify app dev` interactively in a REAL terminal once; the CLI caches the password + install, so later runs work from a background shell with no prompt. App install is a one-time browser OAuth click by the user (open the Preview URL the CLI prints).
+- App Proxy curl behind the storefront password: POST `form_type=storefront_password&password=imefru` to `https://reviewos.myshopify.com/password` with a cookie jar, then GET the proxy URL with that jar.
+- Shopify auth: `shopify auth login` (account rishetmehra11@gmail.com). Device-code prompt expires fast — complete the browser step promptly.
