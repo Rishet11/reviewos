@@ -7,16 +7,17 @@
 - D3: Groq AI service (`app/services/ai/`: provider.ts / groq.ts / index.ts / summaries.server.ts, model llama-3.3-70b-versatile, AI_PROVIDER env-switchable). Cached summaries in AiSummary (min 3 reviews to generate, refresh when cohort grows >=5 or >=20%, never per-page-load; cohortKey = sorted attr=value pairs). `/api/ai/summary` route, ai-summary widget block (refetches on filter change, seq-guarded against stale responses, hides when null), `/admin` with per-product "Generate AI demo reviews" (8 via Groq) + "Regenerate summary". Exit criterion verified in headless browser: clicking 18-24 chip swapped in a distinct cohort summary; caching confirmed (no Groq call on reload). Diff-reviewer pass clean; known soft spots: getOrGenerateSummary trusts callers to keep scope/filters consistent; no unit tests on threshold/cohortKey logic (verified by browser + code read only).
 - D4: trust-badges widget block (marketplace badge cards from /api/marketplace: logo with initials fallback, stars, "4.3 | 812 reviews", link-out with noopener; hides if no stats) + ugc-gallery block ("Photos from customers" strip, own filter-aware fetch via gallerySeq-guarded loadGallery, lazy thumbs, "+N more" tile) with lightbox (prev/next, arrow keys, Escape, backdrop close, focus return; closed on filter refetch). Verified in headless browser: correct badge hrefs, lightbox open/nav/close, filter chip narrowed gallery 8 -> 2 thumbs, no console errors. Diff-reviewer clean; noted non-blocking: onerror-attr escaping pattern in trust-badges.ts:12 is safe only because value is 1 char (do not reuse with longer strings); document keydown listener never removed (safe, single mount per page).
 
+- D5: design polish (real PDP layout with header/product hero on demo pages, widget styles.css rewrite: type scale, spacing rhythm, hover states, darker lightbox, reduced-motion fallback, 375px responsive; admin cleanup) + deployed to Vercel: **https://reviewos-chi.vercel.app** (project "reviewos" under rishets-projects, zero-config RR8 build, @vercel/react-router preset NOT used, it only supports RR7). DB moved SQLite -> Neon Postgres (Vercel Marketplace install "reviewos-db", free_v3 plan; DATABASE_URL auto-injected; local .env also points at Neon now, sqlite dev.db retired; old sqlite migrations deleted, schema managed via `prisma db push` + seed). GROQ_API_KEY set in Vercel prod (gotcha: piping it with a trailing newline made every fetch to Groq throw Headers TypeError -> 500s; re-added with printf '%s'). Live-verified in headless browser: all blocks render, filter click changes AI summary, 6/6 stable widget mounts, home 200.
+
 ## In progress
-- Nothing mid-file. Next milestone not started.
+- Nothing mid-file. Phase D complete.
 
 ## Next
-- D5: design polish (impeccable / frontend-design skill) + deploy to Vercel/Render free tier, shareable URL.
 - After Phase D: stakeholder feedback → Shopify phases per ROADMAP.md.
 
 ## Gotchas
 - Run: `cd reviewos && npm run dev` → http://localhost:5173/demo/glow-lab-vitamin-c-serum (kill stale: `lsof -ti:5173 | xargs kill`).
-- Env: GROQ_API_KEY in `reviewos/.env` (present; user must ROTATE it post-demo, it was exposed in chat). DATABASE_URL is relative to prisma/ ("file:./dev.db").
+- Env: GROQ_API_KEY in `reviewos/.env` (present; user must ROTATE it post-demo, it was exposed in chat). DATABASE_URL now points at Neon Postgres (shared by local dev and prod; .env.local has the full Vercel-pulled set). ROTATE both the exposed Groq key and consider a separate dev DB branch before real usage.
 - Widget must mount after React hydration (window.load in widget/src/index.ts) — do not "simplify" back to DOMContentLoaded, it breaks everything silently.
 - Reseed: `npm run seed`. Typecheck: `npm run typecheck`. Playwright is installed for headless verification (screenshots + console errors).
 - Follow CLAUDE.md orchestration policy: delegate builds to sonnet subagents with full cold-start specs, verify their claims yourself, update this file after each milestone.

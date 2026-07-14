@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useFetcher } from "react-router";
 import type { Route } from "./+types/admin";
 import { prisma } from "~/services/db.server";
@@ -72,13 +71,13 @@ export default function Admin({ loaderData }: Route.ComponentProps) {
   const { products } = loaderData;
 
   return (
-    <main style={{ maxWidth: 800, margin: "0 auto", padding: "40px 20px", fontFamily: "sans-serif" }}>
-      <h1 style={{ marginBottom: 8 }}>ReviewOS admin (demo)</h1>
-      <p style={{ color: "#555", marginBottom: 32 }}>
+    <main className="mx-auto max-w-3xl px-5 py-10">
+      <h1 className="mb-1 text-2xl font-semibold text-gray-900">ReviewOS admin (demo)</h1>
+      <p className="mb-8 text-gray-500">
         Generate fabricated demo reviews and refresh AI summaries per product.
       </p>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="flex flex-col gap-3">
         {products.map((product) => (
           <ProductRow key={product.id} product={product} />
         ))}
@@ -95,24 +94,32 @@ function ProductRow({ product }: { product: { id: string; name: string; slug: st
   const summaryResult = summaryFetcher.data as { ok: boolean; error?: string; generated?: boolean } | undefined;
 
   return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+    <div className="rounded-lg border border-gray-200 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div style={{ fontWeight: 600 }}>{product.name}</div>
-          <div style={{ color: "#888", fontSize: 13 }}>/demo/{product.slug}</div>
+          <div className="font-medium text-gray-900">{product.name}</div>
+          <div className="text-sm text-gray-400">/demo/{product.slug}</div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div className="flex gap-2">
           <generateFetcher.Form method="post">
             <input type="hidden" name="intent" value="generate-reviews" />
             <input type="hidden" name="productId" value={product.id} />
-            <button type="submit" disabled={generateFetcher.state !== "idle"} style={btnStyle}>
+            <button
+              type="submit"
+              disabled={generateFetcher.state !== "idle"}
+              className="rounded-md bg-gray-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
+            >
               {generateFetcher.state !== "idle" ? "Generating…" : "Generate AI demo reviews"}
             </button>
           </generateFetcher.Form>
           <summaryFetcher.Form method="post">
             <input type="hidden" name="intent" value="regenerate-summary" />
             <input type="hidden" name="productId" value={product.id} />
-            <button type="submit" disabled={summaryFetcher.state !== "idle"} style={btnStyle}>
+            <button
+              type="submit"
+              disabled={summaryFetcher.state !== "idle"}
+              className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            >
               {summaryFetcher.state !== "idle" ? "Refreshing…" : "Regenerate summary"}
             </button>
           </summaryFetcher.Form>
@@ -120,14 +127,12 @@ function ProductRow({ product }: { product: { id: string; name: string; slug: st
       </div>
 
       {generateResult && (
-        <div style={{ marginTop: 8, fontSize: 13, color: generateResult.ok ? "#16794c" : "#dc2626" }}>
-          {generateResult.ok
-            ? `Added ${generateResult.count} reviews.`
-            : generateResult.error}
+        <div className={`mt-2 text-sm ${generateResult.ok ? "text-emerald-700" : "text-red-600"}`}>
+          {generateResult.ok ? `Added ${generateResult.count} reviews.` : generateResult.error}
         </div>
       )}
       {summaryResult && (
-        <div style={{ marginTop: 8, fontSize: 13, color: summaryResult.ok ? "#16794c" : "#dc2626" }}>
+        <div className={`mt-2 text-sm ${summaryResult.ok ? "text-emerald-700" : "text-red-600"}`}>
           {summaryResult.ok
             ? summaryResult.generated
               ? "Summary regenerated."
@@ -138,13 +143,3 @@ function ProductRow({ product }: { product: { id: string; name: string; slug: st
     </div>
   );
 }
-
-const btnStyle: CSSProperties = {
-  background: "#1a56db",
-  color: "#fff",
-  border: "none",
-  borderRadius: 6,
-  padding: "8px 14px",
-  fontSize: 13,
-  cursor: "pointer",
-};
