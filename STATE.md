@@ -19,8 +19,12 @@
 ## In progress
 - Nothing mid-file. Phase 1 complete; `shopify app dev` was left running (my background) for verification.
 
+## Decisions (Phase 1 close-out, don't re-ask)
+- Git: Phase 1 merged to `main` (commit 9a92ef4); per-phase feature branches going forward.
+- DB for shopify-app: **Neon Postgres from the start of Phase 2** (NOT SQLite; Prisma can't switch provider per env — LEARNINGS #5, prod needs Postgres). Provision a NEW Neon DB separate from the demo's (needs user's one-time terms click — LEARNINGS #8); set the datasource provider to postgresql before adding review models; sessions ride the same DB.
+
 ## Next
-- Phase 2 (Review core): port `reviewos/app/services/*` (framework-free, copy nearly as-is) into `shopify-app/app/services/`, add Prisma models, Polaris moderation/attribute/settings admin, seed. See ROADMAP.md. Request Shopify protected-customer-data access when models first touch customer/order data.
+- Phase 2 (Review core): port `reviewos/app/services/*` (framework-free, copy nearly as-is) into `shopify-app/app/services/`, add Prisma models (Review, ReviewMedia, AttributeDefinition, MarketplaceSource/Stat/Review, AiSummary, Settings) on Neon Postgres, Polaris moderation/attribute/settings admin under `app/routes/app.*`, seed. See ROADMAP.md. Request Shopify protected-customer-data access early (Phase 6 dependency) if models touch customer/order data.
 - Port map: widget bundle (`reviewos/public/widget/reviewos.{js,css}`) drops into the Theme App Extension `assets/`; a Liquid block renders `<div data-reviewos ...>` for the non-React AUTO-MOUNT path (keep it working — LEARNINGS #1). `/api/*` JSON contracts become App Proxy routes under `app/routes/proxy.*` (pattern proven this phase).
 - Port map for Phases 2-4: `app/services/*` copy nearly as-is (framework-free); widget bundle drops in as a Theme App Extension asset (non-React embed uses the auto-mount path, keep it working); `/api/*` JSON contracts become App Proxy routes unchanged.
 - Read LEARNINGS.md before changing widget mount, event handling, escaping, URL sync, or deploy config.
