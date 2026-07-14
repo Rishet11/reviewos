@@ -15,7 +15,9 @@
 - Nothing mid-file. Phase D complete.
 
 ## Next
-- After Phase D: stakeholder feedback → Shopify phases per ROADMAP.md.
+- Phase 0 (user actions): Shopify dev account + development store; then Phase 1 scaffold (official React Router template via `shopify app init`, embedded Polaris admin, hello-world theme app block, App Proxy JSON route). See ROADMAP.md.
+- Port map for Phases 2-4: `app/services/*` copy nearly as-is (framework-free); widget bundle drops in as a Theme App Extension asset (non-React embed uses the auto-mount path, keep it working); `/api/*` JSON contracts become App Proxy routes unchanged.
+- Read LEARNINGS.md before changing widget mount, event handling, escaping, URL sync, or deploy config.
 
 ## Gotchas
 - Run: `cd reviewos && npm run dev` → http://localhost:5173/demo/glow-lab-vitamin-c-serum (kill stale: `lsof -ti:5173 | xargs kill`).
