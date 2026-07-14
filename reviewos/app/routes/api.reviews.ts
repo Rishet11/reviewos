@@ -30,13 +30,17 @@ export async function loader({ request }: { request: Request }) {
   const pageParam = params.get("page");
   const pageSizeParam = params.get("pageSize");
 
+  const rating = Number(ratingParam);
+  const page = Math.max(1, Math.trunc(Number(pageParam)) || 1);
+  const pageSize = Math.min(200, Math.max(1, Math.trunc(Number(pageSizeParam)) || 10));
+
   const result = await listReviews({
     productSlug,
     filters,
-    rating: ratingParam ? Number(ratingParam) : undefined,
+    rating: Number.isInteger(rating) && rating >= 1 && rating <= 5 ? rating : undefined,
     sort: (params.get("sort") as any) ?? "recent",
-    page: pageParam ? Number(pageParam) : 1,
-    pageSize: pageSizeParam ? Number(pageSizeParam) : 10,
+    page,
+    pageSize,
     status: params.get("status") ?? "approved",
   });
 
@@ -48,7 +52,21 @@ export async function action({ request }: { request: Request }) {
     return Response.json({ error: "method_not_allowed" }, { status: 405 });
   }
 
-  const body = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "invalid_json" }, { status: 400 });
+  }
+
+  const customerName = typeof body.customerName === "string" ? body.customerName.trim() : "";
+  const reviewBody = typeof body.body === "string" ? body.body.trim() : "";
+  if (!customerName || !reviewBody) {
+    return Response.json({ error: "name_and_body_required" }, { status: 400 });
+  }
+  if (!Number.isInteger(body.rating) || body.rating < 1 || body.rating > 5) {
+    return Response.json({ error: "rating_must_be_1_to_5" }, { status: 400 });
+  }
 
   const product = await prisma.product.findUnique({
     where: { slug: body.productSlug },
@@ -60,11 +78,11 @@ export async function action({ request }: { request: Request }) {
 
   const review = await createReview({
     productId: product.id,
-    customerName: body.customerName,
+    customerName,
     customerEmail: body.customerEmail,
     rating: body.rating,
     title: body.title,
-    body: body.body,
+    body: reviewBody,
     attributes: body.attributes ? JSON.stringify(body.attributes) : "{}",
     source: body.source ?? "website",
   });

@@ -10,7 +10,7 @@ export function renderSummary(state: WidgetState): string {
       <div class="rvos-summary__score">${avg}</div>
       <div class="rvos-summary__meta">
         <div class="rvos-stars">${stars(Math.round(summary.average))}</div>
-        <div class="rvos-summary__count">${summary.count} review${summary.count === 1 ? "" : "s"}</div>
+        <div class="rvos-summary__count">${summary.count.toLocaleString()} review${summary.count === 1 ? "" : "s"}</div>
       </div>
       <button type="button" class="rvos-btn rvos-btn--primary rvos-summary__write" data-action="open-write">
         Write a review

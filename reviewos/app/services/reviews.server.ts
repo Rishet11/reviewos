@@ -164,8 +164,10 @@ export async function createReview(data: CreateReviewInput) {
 }
 
 export async function voteHelpful(reviewId: string) {
-  return prisma.review.update({
+  const { count } = await prisma.review.updateMany({
     where: { id: reviewId },
     data: { helpfulCount: { increment: 1 } },
   });
+  if (count === 0) return null;
+  return prisma.review.findUnique({ where: { id: reviewId } });
 }

@@ -59,7 +59,7 @@ export function renderFeed(state: WidgetState): string {
 
   const toolbar = `
     <div class="rvos-feed__toolbar">
-      <span class="rvos-feed__total">${state.total} review${state.total === 1 ? "" : "s"}</span>
+      <span class="rvos-feed__total">${state.total.toLocaleString()} review${state.total === 1 ? "" : "s"}</span>
       <select class="rvos-select" data-action="set-sort">${sortOptions}</select>
     </div>
   `;

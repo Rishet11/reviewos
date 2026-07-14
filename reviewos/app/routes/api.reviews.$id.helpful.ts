@@ -12,5 +12,8 @@ export async function action({
   }
 
   const review = await voteHelpful(params.id);
+  if (!review) {
+    return Response.json({ error: "review_not_found" }, { status: 404 });
+  }
   return Response.json({ review });
 }

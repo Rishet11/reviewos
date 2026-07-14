@@ -1,6 +1,14 @@
+import { useEffect, useRef } from "react";
 import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/demo.$slug";
 import { prisma } from "~/services/db.server";
+
+declare global {
+  interface Window {
+    ReviewOS?: { mount: (host?: HTMLElement) => void };
+    ReviewOSQueue?: Array<() => void>;
+  }
+}
 
 export async function loader({ params }: Route.LoaderArgs) {
   const product = await prisma.product.findUnique({
@@ -21,6 +29,25 @@ export function meta() {
 export default function DemoProduct() {
   const { product } = useLoaderData<typeof loader>();
   const priceRupees = (product.price / 100).toFixed(2);
+  const reviewsHostRef = useRef<HTMLDivElement>(null);
+
+  // Mount the widget only after React has committed and hydrated this tree,
+  // never on window.load. The widget script may load before, during, or
+  // after hydration (it's `defer`red, order isn't guaranteed relative to
+  // React), so if it's already loaded we mount immediately; otherwise we
+  // queue a callback for it to run when it finishes loading. Either way the
+  // widget writes into the div only once React is done with it, so React's
+  // hydration/mismatch-recovery re-render can never wipe it afterwards (this
+  // div's children are DOM-managed, not JSX, and the div's position in the
+  // tree is stable, so React never touches them post-mount).
+  useEffect(() => {
+    const mount = () => window.ReviewOS?.mount(reviewsHostRef.current ?? undefined);
+    if (window.ReviewOS) {
+      mount();
+    } else {
+      (window.ReviewOSQueue ??= []).push(mount);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -76,12 +103,17 @@ export default function DemoProduct() {
             Customer reviews
           </h2>
           {/*
-            This mirrors exactly how a third-party storefront (e.g. a Shopify theme)
-            would embed the widget: a script tag loading the built bundle, plus a
-            host div carrying the mount config as data attributes. No React here.
+            Host div carrying the mount config as data attributes, same shape a
+            third-party storefront embed would use. Because this page is a
+            hydrated React app, the div opts out of the widget's auto-mount
+            (data-reviewos-manual) and the useEffect above mounts it after
+            hydration; plain non-React embeds omit that attribute and get
+            auto-mounted.
           */}
           <div
+            ref={reviewsHostRef}
             data-reviewos
+            data-reviewos-manual
             data-product={product.slug}
             data-api=""
             data-blocks="ai-summary,summary,trust-badges,distribution,filters,ugc-gallery,feed,write"

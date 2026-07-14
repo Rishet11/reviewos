@@ -8,8 +8,11 @@ export function renderTrustBadges(state: WidgetState): string {
   const cards = stats
     .map((stat) => {
       const initial = esc(stat.source.name.trim().charAt(0).toUpperCase() || "?");
+      // Fallback is a pre-rendered hidden sibling so the onerror handler stays
+      // static JS: interpolating data into a JS-in-attribute context is unsafe
+      // (HTML entity escaping is undone before the JS parses).
       const logo = stat.source.logoUrl
-        ? `<img class="rvos-trust-badge__logo" src="${esc(stat.source.logoUrl)}" alt="${esc(stat.source.name)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'rvos-trust-badge__fallback',textContent:'${initial}'}))" />`
+        ? `<img class="rvos-trust-badge__logo" src="${esc(stat.source.logoUrl)}" alt="${esc(stat.source.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display=''" /><div class="rvos-trust-badge__fallback" style="display:none">${initial}</div>`
         : `<div class="rvos-trust-badge__fallback">${initial}</div>`;
 
       return `
