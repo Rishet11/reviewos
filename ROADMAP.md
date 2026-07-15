@@ -33,9 +33,10 @@ Exit: full submit→moderate→display loop on dev store; blocks reorder/configu
 Real product linkage: `Product.slug = Shopify handle` via catalog sync (`syncProductsFromCatalog`) + auto-create on unknown handle (`resolveProductForShop`), GID stored for future metafield writeback. AI (Groq, provider-pluggable; Anthropic swappable later): overall + cohort (filter-aware) summaries, DB caching + min-review (3) threshold, `force` regen; ai-summary block wired (refetch on filter change, hide when null); admin regenerate control + products sync page. Merchant-facing "review generation" = AI condensation of real reviews; `fabricateReviews` stays dev-flag-only, never merchant-facing (FTC + Shopify 1.3). Deferred within Phase 4: tag/sentiment extraction, in-process job queue (BullMQ+Redis → Phase 8), `reviews.rating` metafield writeback (GID column added to enable it).
 Exit: summary appears, changes when filter chips change, regenerates on demand. (Code verified: typecheck/vitest/build green. Live theme-editor confirmation outstanding.)
 
-## Phase 5 — Marketplace aggregation (merchant-owned data)
-Marketplace manager admin (manual stats entry + CSV review import for Amazon/Flipkart/Nykaa/Smytten exports), marketplace-ratings trust-badge block, per-marketplace AI summaries, ugc-gallery block with lightbox. URL-mapping model: merchant maps a marketplace product URL to a Shopify product once; stored on `MarketplaceSource.externalUrl`. Pluggable `MarketplaceConnector` interface for swappable fetch backend: CSV import in v1, URL-paste or licensed API with merchant-supplied (BYO) key later. Note: no own-infrastructure bulk scraping in any App Store submission build.
-Exit: marketplace badges + "What Amazon customers say" live on storefront from imported data.
+## Phase 5 — Marketplace aggregation (merchant-owned data) — DONE at Slice A (2026-07-15)
+**Slice A (SHIPPED):** marketplace manager admin (manual stats entry), marketplace-ratings trust-badge block, storefront trust badges + link-outs. Merchant types the public marketplace figure (e.g. "Amazon 4.6 · 12,431"); manual stat is authoritative. Marketplace ratings stay SEPARATE from the standard `reviews.rating`/overall badge. This is the defensible merchant-owned design (RESEARCH.md L26). Verified: tsc/vitest 42/vitest build green; live theme-editor check outstanding.
+**Slice B (PARKED → Phase 7d, unchanged):** CSV review-body import + per-marketplace AI summaries ("What Amazon customers say") + UGC gallery. GATE FAILED (web-research 2026-07-15): no marketplace (Amazon/Flipkart/Nykaa) exposes review bodies to sellers, so a "marketplace review CSV" has no legitimate source (same scraping provenance as Phase 5b, liability shifted to merchant). Moved to Phase 7d as-is per user; not built in submission scope.
+Original spec retained for 7d: pluggable connector interface (CSV v1), per-product URL on `MarketplaceStat.url`. No own-infrastructure bulk scraping in any App Store submission build.
 
 ## Phase 5b — Marketplace live-fetch connector (optional, flag-gated)
 Adapter interface `app/services/marketplace/providers/` (provider contract: fetchStats, fetchReviews); providers: Unwrangle, Real Data API (Flipkart/amazon.in), generic JSON; merchant supplies own API key; scheduled refresh via background jobs; per-shop + global kill switch; risk notice in admin UI (see PRD "Live fetch risk").
@@ -59,8 +60,8 @@ Exit: webhook test suite passes.
 Standard review metaobject + reviews.rating / reviews.rating_count metafield sync, including a backfill script for all reviews created in earlier phases.
 Exit: metafields visible on product; backfill idempotent on rerun.
 
-## Phase 7d — Competitor review import
-Judge.me/Loox export formats.
+## Phase 7d — Competitor + marketplace review import
+Judge.me/Loox export formats. PLUS the parked Phase 5 Slice B (marketplace CSV review-body import + per-marketplace AI summaries + UGC gallery) as originally specced — feedstock caveat: only build against sources with a legitimate merchant-owned export (Trustpilot Business API, Google Business Profile API, Judge.me/Loox/Yotpo CSV); marketplace CSVs (Amazon/Flipkart/Nykaa) have no legit export (see Phase 5 note).
 Exit: sample export file imports cleanly.
 
 ## Phase 7e — Performance pass
