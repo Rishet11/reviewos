@@ -17,6 +17,7 @@ import {
 } from "../services/reviews.server";
 import { REVIEW_STATUSES, type ReviewStatus } from "../services/review-status";
 import { getOrGenerateSummary } from "../services/ai/summaries.server";
+import { syncRatingMetafields } from "../services/metafields.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -39,8 +40,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { reviews, total, products, status, productId };
 };
 
+async function trySyncRatingMetafields(
+  shop: string,
+  productId: string,
+  admin: Parameters<typeof syncRatingMetafields>[2]
+) {
+  try {
+    await syncRatingMetafields(shop, productId, admin);
+  } catch (err) {
+    console.error("syncRatingMetafields failed", { shop, productId, err });
+  }
+}
+
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
 
   const form = await request.formData();
   const intent = String(form.get("intent"));
@@ -54,6 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
       const updated = await moderateReview(session.shop, reviewId, status);
       if (!updated) return { error: "Review not found" };
+      await trySyncRatingMetafields(session.shop, updated.productId, admin);
       return { ok: true };
     }
     case "reply": {
