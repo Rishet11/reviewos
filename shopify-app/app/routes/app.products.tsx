@@ -10,6 +10,7 @@ import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import { prisma } from "../services/db.server";
 import { syncProductsFromCatalog } from "../services/products.server";
+import { backfillAllRatingMetafields } from "../services/metafields.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -33,6 +34,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const result = await syncProductsFromCatalog(session.shop, admin);
       return { ok: true, result };
     }
+    case "backfill-ratings": {
+      const result = await backfillAllRatingMetafields(session.shop, admin);
+      return { ok: true, backfillResult: result };
+    }
     default:
       return { error: `Unknown intent: ${intent}` };
   }
@@ -41,16 +46,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 export default function Products() {
   const { products } = useLoaderData<typeof loader>();
   const syncFetcher = useFetcher<typeof action>();
+  const backfillFetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
 
   useEffect(() => {
-    if (syncFetcher.data && "ok" in syncFetcher.data && syncFetcher.data.ok) {
+    if (syncFetcher.data && "ok" in syncFetcher.data && syncFetcher.data.ok && syncFetcher.data.result) {
       const { created, updated, total } = syncFetcher.data.result;
       shopify.toast.show(
         `Synced ${total} products (${created} created, ${updated} updated)`
       );
     }
   }, [syncFetcher.data, shopify]);
+
+  useEffect(() => {
+    if (
+      backfillFetcher.data &&
+      "ok" in backfillFetcher.data &&
+      backfillFetcher.data.ok &&
+      backfillFetcher.data.backfillResult
+    ) {
+      const { synced, skipped, failed } = backfillFetcher.data.backfillResult;
+      shopify.toast.show(
+        `Backfilled ${synced} products (${skipped} skipped, ${failed} failed)`,
+      );
+    }
+  }, [backfillFetcher.data, shopify]);
 
   return (
     <s-page heading="Products">
@@ -67,7 +87,29 @@ export default function Products() {
             </s-button>
           </syncFetcher.Form>
 
-          {syncFetcher.data && "ok" in syncFetcher.data && syncFetcher.data.ok && (
+          <backfillFetcher.Form method="post">
+            <input type="hidden" name="intent" value="backfill-ratings" />
+            <s-button
+              variant="secondary"
+              type="submit"
+              {...(backfillFetcher.state !== "idle" ? { loading: true } : {})}
+            >
+              Backfill product ratings
+            </s-button>
+          </backfillFetcher.Form>
+
+          {backfillFetcher.data &&
+            "ok" in backfillFetcher.data &&
+            backfillFetcher.data.ok &&
+            backfillFetcher.data.backfillResult && (
+              <s-text color="subdued">
+                Backfilled {backfillFetcher.data.backfillResult.synced}, skipped{" "}
+                {backfillFetcher.data.backfillResult.skipped}, failed{" "}
+                {backfillFetcher.data.backfillResult.failed}.
+              </s-text>
+            )}
+
+          {syncFetcher.data && "ok" in syncFetcher.data && syncFetcher.data.ok && syncFetcher.data.result && (
             <s-text color="subdued">
               Created {syncFetcher.data.result.created}, updated{" "}
               {syncFetcher.data.result.updated}, total{" "}
