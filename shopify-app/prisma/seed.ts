@@ -195,7 +195,56 @@ async function main() {
   await seedReviewsForShoes(shoes.id);
   await seedReviewsForEarbuds(earbuds.id);
 
+  await seedTrustBadgeDemo();
+
   console.log("Seed complete.");
+}
+
+// Additive: separate demo shop for the Phase 5 Slice A trust-badges walkthrough
+// (does not touch SHOP's data above, and is not wiped on reseed).
+const TRUST_BADGE_SHOP = "reviewos.myshopify.com";
+
+async function seedTrustBadgeDemo() {
+  const snowboard = await prisma.product.upsert({
+    where: {
+      shop_slug: { shop: TRUST_BADGE_SHOP, slug: "the-collection-snowboard-liquid" },
+    },
+    update: {},
+    create: {
+      shop: TRUST_BADGE_SHOP,
+      slug: "the-collection-snowboard-liquid",
+      name: "The Collection Snowboard: Liquid",
+      category: "snowboards",
+      description: "",
+      price: 0,
+      imageUrl: "",
+    },
+  });
+
+  const amazon = await prisma.marketplaceSource.upsert({
+    where: { shop_name: { shop: TRUST_BADGE_SHOP, name: "Amazon" } },
+    update: {},
+    create: { shop: TRUST_BADGE_SHOP, name: "Amazon", logoUrl: "", baseUrl: "https://amazon.com" },
+  });
+
+  await prisma.marketplaceStat.upsert({
+    where: {
+      shop_productId_sourceId: {
+        shop: TRUST_BADGE_SHOP,
+        productId: snowboard.id,
+        sourceId: amazon.id,
+      },
+    },
+    update: { rating: 4.6, reviewCount: 12431, url: "https://amazon.com/dp/the-collection-snowboard-liquid" },
+    create: {
+      shop: TRUST_BADGE_SHOP,
+      productId: snowboard.id,
+      sourceId: amazon.id,
+      rating: 4.6,
+      reviewCount: 12431,
+      url: "https://amazon.com/dp/the-collection-snowboard-liquid",
+    },
+  });
 }
 
 const SKIN_TYPES = ["dry", "oily", "combination", "sensitive"];
