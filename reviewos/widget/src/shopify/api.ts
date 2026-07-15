@@ -5,7 +5,7 @@
 // shopify-app extension README / PORT notes for the endpoint list this
 // targets: GET/POST <base>/reviews, GET <base>/summary, GET <base>/distribution,
 // GET <base>/attributes.
-import type { AttributeDef, Review, Sort } from "../types";
+import type { AttributeDef, MarketplaceStat, Review, Sort } from "../types";
 
 async function getJSON<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -62,6 +62,14 @@ export async function fetchAttributes(apiBase: string, productId: string) {
     `${apiBase}/attributes?${params.toString()}`
   );
   return data.attributes.filter((a) => a.display);
+}
+
+export async function fetchMarketplaceStats(apiBase: string, productId: string) {
+  const params = new URLSearchParams({ product: productId });
+  const data = await getJSON<{ stats: MarketplaceStat[] }>(
+    `${apiBase}/marketplace?${params.toString()}`
+  );
+  return data.stats;
 }
 
 export type ListReviewsArgs = {

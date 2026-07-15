@@ -14,9 +14,11 @@ import { renderFeed } from "../blocks/feed";
 import { renderFilters } from "../blocks/filters";
 import { renderWriteModal } from "../blocks/write";
 import { renderAiSummary } from "../blocks/ai-summary";
+import { renderTrustBadges } from "../blocks/trust-badges";
 import {
   fetchAttributes,
   fetchDistribution,
+  fetchMarketplaceStats,
   fetchReviews,
   fetchSummary,
   postReview,
@@ -106,6 +108,9 @@ export function mountShopifyBlock(el: HTMLElement) {
         break;
       case "ai-summary":
         el.innerHTML = renderAiSummary(state);
+        break;
+      case "trust-badges":
+        el.innerHTML = renderTrustBadges(state);
         break;
       default:
         el.innerHTML = "";
@@ -282,13 +287,15 @@ export function mountShopifyBlock(el: HTMLElement) {
       const needsAttrs = blockType === "filter-chips" || blockType === "write-review";
       const needsReviews = blockType === "review-feed";
       const needsAiSummary = blockType === "ai-summary";
+      const needsMarketplace = blockType === "trust-badges";
 
       // Rating stats (average/count/byStar) come from /distribution only.
       // /summary is the separate AI text summary and is not wired into any
       // block yet.
-      const [distribution, attributeDefs] = await Promise.all([
+      const [distribution, attributeDefs, marketplaceStats] = await Promise.all([
         needsSummary ? fetchDistribution(apiBase, productId) : Promise.resolve(null),
         needsAttrs ? fetchAttributes(apiBase, productId) : Promise.resolve([]),
+        needsMarketplace ? fetchMarketplaceStats(apiBase, productId) : Promise.resolve([]),
       ]);
 
       store.setState({
@@ -296,6 +303,7 @@ export function mountShopifyBlock(el: HTMLElement) {
           ? { average: distribution.average, count: distribution.count, byStar: distribution.byStar }
           : null,
         attributeDefs,
+        marketplaceStats,
         loading: false,
       });
 
