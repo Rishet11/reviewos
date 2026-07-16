@@ -1,0 +1,19 @@
+name: review-request-dispatch
+
+# Triggers the review-request email dispatch route on prod (Render).
+# Also keeps the free-tier Render service warm.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST dispatch route
+        run: |
+          curl -fsS -X POST \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            --max-time 120 --retry 2 --retry-delay 30 \
+            https://reviewos-6p4p.onrender.com/api/review-requests/dispatch
