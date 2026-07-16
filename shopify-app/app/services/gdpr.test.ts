@@ -27,6 +27,22 @@ function makeMockClient() {
     product: {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    orderLineItem: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    orderCapture: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    reviewRequest: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
+    emailSuppression: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      upsert: vi.fn().mockResolvedValue({ id: "sup_1" }),
+    },
     settings: {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
@@ -65,6 +81,18 @@ describe("redactShop", () => {
     expect(mock.product.deleteMany).toHaveBeenCalledWith({
       where: { shop: "shopA" },
     });
+    expect(mock.orderLineItem.deleteMany).toHaveBeenCalledWith({
+      where: { orderCapture: { shop: "shopA" } },
+    });
+    expect(mock.orderCapture.deleteMany).toHaveBeenCalledWith({
+      where: { shop: "shopA" },
+    });
+    expect(mock.reviewRequest.deleteMany).toHaveBeenCalledWith({
+      where: { shop: "shopA" },
+    });
+    expect(mock.emailSuppression.deleteMany).toHaveBeenCalledWith({
+      where: { shop: "shopA" },
+    });
     expect(mock.settings.deleteMany).toHaveBeenCalledWith({
       where: { shop: "shopA" },
     });
@@ -84,11 +112,15 @@ describe("redactShop", () => {
       ...mock.marketplaceSource.deleteMany.mock.calls,
       ...mock.attributeDefinition.deleteMany.mock.calls,
       ...mock.product.deleteMany.mock.calls,
+      ...mock.orderLineItem.deleteMany.mock.calls,
+      ...mock.orderCapture.deleteMany.mock.calls,
+      ...mock.reviewRequest.deleteMany.mock.calls,
+      ...mock.emailSuppression.deleteMany.mock.calls,
       ...mock.settings.deleteMany.mock.calls,
       ...mock.session.deleteMany.mock.calls,
     ];
 
-    expect(allCalls.length).toBe(9); // every model touched exactly once
+    expect(allCalls.length).toBe(13); // every model touched exactly once
     for (const [args] of allCalls) {
       const serialized = JSON.stringify(args);
       expect(serialized).toContain('"shop":"shopA"');
@@ -105,15 +137,24 @@ describe("collectCustomerData", () => {
     expect(mock.review.findMany).toHaveBeenCalledWith({
       where: { shop: "shopA", customerEmail: "x@y.com" },
     });
+    expect(mock.orderCapture.findMany).toHaveBeenCalledWith({
+      where: { shop: "shopA", customerEmail: "x@y.com" },
+      include: { lineItems: true },
+    });
+    expect(mock.reviewRequest.findMany).toHaveBeenCalledWith({
+      where: { shop: "shopA", customerEmail: "x@y.com" },
+    });
   });
 
-  it("returns [] and never queries when email is missing (no whole-shop leak)", async () => {
+  it("returns empty and never queries when email is missing (no whole-shop leak)", async () => {
     const mock = makeMockClient();
 
     const result = await collectCustomerData("shopA", { email: null }, mock);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ reviews: [], orders: [], reviewRequests: [] });
     expect(mock.review.findMany).not.toHaveBeenCalled();
+    expect(mock.orderCapture.findMany).not.toHaveBeenCalled();
+    expect(mock.reviewRequest.findMany).not.toHaveBeenCalled();
   });
 });
 
@@ -130,6 +171,18 @@ describe("redactCustomer", () => {
       where: { shop: "shopA", customerEmail: "x@y.com" },
       data: { customerName: "Anonymous", customerEmail: null },
     });
+    expect(mock.orderCapture.updateMany).toHaveBeenCalledWith({
+      where: { shop: "shopA", customerEmail: "x@y.com" },
+      data: { customerEmail: null, customerId: null },
+    });
+    expect(mock.emailSuppression.upsert).toHaveBeenCalledWith({
+      where: { shop_email: { shop: "shopA", email: "x@y.com" } },
+      update: { reason: "customer_redact" },
+      create: { shop: "shopA", email: "x@y.com", reason: "customer_redact" },
+    });
+    expect(mock.reviewRequest.deleteMany).toHaveBeenCalledWith({
+      where: { shop: "shopA", customerEmail: "x@y.com" },
+    });
   });
 
   it("returns matched:0 and does nothing when email is null (unlinkable gap)", async () => {
@@ -140,5 +193,8 @@ describe("redactCustomer", () => {
     expect(result).toEqual({ matched: 0 });
     expect(mock.reviewMedia.deleteMany).not.toHaveBeenCalled();
     expect(mock.review.updateMany).not.toHaveBeenCalled();
+    expect(mock.orderCapture.updateMany).not.toHaveBeenCalled();
+    expect(mock.emailSuppression.upsert).not.toHaveBeenCalled();
+    expect(mock.reviewRequest.deleteMany).not.toHaveBeenCalled();
   });
 });
