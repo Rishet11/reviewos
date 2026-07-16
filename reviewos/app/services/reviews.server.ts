@@ -1,4 +1,5 @@
 import { prisma } from "./db.server";
+import { MAX_MEDIA_PER_REVIEW } from "./media.server";
 
 export type ReviewSort = "recent" | "helpful" | "rating_desc" | "rating_asc";
 
@@ -133,6 +134,14 @@ export async function getRatingSummary(productSlug: string) {
   return { average, count, byStar };
 }
 
+export type CreateReviewMediaInput = {
+  type: string;
+  url: string;
+  storageKey?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+};
+
 export type CreateReviewInput = {
   productId: string;
   customerName: string;
@@ -144,22 +153,47 @@ export type CreateReviewInput = {
   source?: string;
   status?: string;
   createdAt?: Date;
+  media?: CreateReviewMediaInput[];
 };
 
 export async function createReview(data: CreateReviewInput) {
-  return prisma.review.create({
-    data: {
-      productId: data.productId,
-      customerName: data.customerName,
-      customerEmail: data.customerEmail,
-      rating: data.rating,
-      title: data.title,
-      body: data.body,
-      attributes: data.attributes ?? "{}",
-      source: data.source ?? "website",
-      status: data.status ?? "pending",
-      ...(data.createdAt ? { createdAt: data.createdAt } : {}),
-    },
+  // Server-side cap regardless of what the client sent - never trust the
+  // client's own count.
+  const media = (data.media ?? []).slice(0, MAX_MEDIA_PER_REVIEW);
+
+  return prisma.$transaction(async (tx) => {
+    const review = await tx.review.create({
+      data: {
+        productId: data.productId,
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        rating: data.rating,
+        title: data.title,
+        body: data.body,
+        attributes: data.attributes ?? "{}",
+        source: data.source ?? "website",
+        status: data.status ?? "pending",
+        ...(data.createdAt ? { createdAt: data.createdAt } : {}),
+      },
+    });
+
+    if (media.length > 0) {
+      await tx.reviewMedia.createMany({
+        data: media.map((m) => ({
+          reviewId: review.id,
+          type: m.type,
+          url: m.url,
+          storageKey: m.storageKey ?? "",
+          mimeType: m.mimeType ?? "",
+          sizeBytes: m.sizeBytes ?? 0,
+        })),
+      });
+    }
+
+    return tx.review.findUniqueOrThrow({
+      where: { id: review.id },
+      include: { media: true },
+    });
   });
 }
 

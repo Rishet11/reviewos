@@ -9,6 +9,8 @@ export default [
   route("api/reviews/:id/helpful", "routes/api.reviews.$id.helpful.ts"),
   route("api/attributes", "routes/api.attributes.ts"),
   route("api/marketplace", "routes/api.marketplace.ts"),
+  route("api/media/presign", "routes/api.media.presign.ts"),
+  route("api/media/upload/:key", "routes/api.media.upload.$key.ts"),
   route("api/ai/summary", "routes/api.ai.summary.ts"),
   route("admin", "routes/admin.tsx"),
 ] satisfies RouteConfig;

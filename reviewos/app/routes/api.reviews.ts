@@ -68,6 +68,24 @@ export async function action({ request }: { request: Request }) {
     return Response.json({ error: "rating_must_be_1_to_5" }, { status: 400 });
   }
 
+  let media: Array<{ type: string; url: string; storageKey?: string; mimeType?: string; sizeBytes?: number }> | undefined;
+  if (body.media !== undefined) {
+    if (!Array.isArray(body.media)) {
+      return Response.json({ error: "invalid_media" }, { status: 400 });
+    }
+    for (const item of body.media) {
+      if (
+        !item ||
+        (item.type !== "image" && item.type !== "video") ||
+        typeof item.url !== "string" ||
+        !item.url.startsWith("/uploads/")
+      ) {
+        return Response.json({ error: "invalid_media" }, { status: 400 });
+      }
+    }
+    media = body.media;
+  }
+
   const product = await prisma.product.findUnique({
     where: { slug: body.productSlug },
   });
@@ -85,6 +103,7 @@ export async function action({ request }: { request: Request }) {
     body: reviewBody,
     attributes: body.attributes ? JSON.stringify(body.attributes) : "{}",
     source: body.source ?? "website",
+    media,
   });
 
   return Response.json({ review }, { status: 201 });

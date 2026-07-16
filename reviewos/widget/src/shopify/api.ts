@@ -108,7 +108,30 @@ export type CreateReviewPayload = {
   title?: string;
   body: string;
   attributes: Record<string, string>;
+  media?: Array<{
+    type: string;
+    url: string;
+    storageKey?: string;
+    mimeType?: string;
+    sizeBytes?: number;
+  }>;
 };
+
+export async function presignMedia(
+  apiBase: string,
+  file: { filename: string; contentType: string; sizeBytes: number }
+) {
+  const res = await fetch(`${apiBase}/media/presign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(file),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? `request failed: ${res.status}`);
+  }
+  return res.json();
+}
 
 export async function postReview(apiBase: string, payload: CreateReviewPayload) {
   const res = await fetch(`${apiBase}/reviews`, {

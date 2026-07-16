@@ -8,7 +8,14 @@ import {
   fetchSummary,
   postHelpful,
   postReview,
+  presignMedia,
 } from "./api";
+import {
+  uploadReviewMedia,
+  revokePreviewUrl,
+  revokeAllPreviewUrls,
+  MAX_MEDIA_PER_REVIEW,
+} from "./media-upload";
 import { renderAiSummary } from "./blocks/ai-summary";
 import { renderSummary } from "./blocks/summary";
 import { renderTrustBadges } from "./blocks/trust-badges";
@@ -75,6 +82,9 @@ export function mountWidget(el: HTMLElement) {
     writeSubmitting: false,
     writeSuccess: false,
     writeError: null,
+    writeMediaFiles: [],
+    writeMediaUploaded: null,
+    writeMediaUploading: false,
   };
 
   const store = createStore(initial);
@@ -334,7 +344,15 @@ export function mountWidget(el: HTMLElement) {
     }
 
     if (action === "open-write") {
-      store.setState({ writeOpen: true, writeSuccess: false, writeError: null, writeRating: 0 });
+      revokeAllPreviewUrls(store.getState().writeMediaFiles);
+      store.setState({
+        writeOpen: true,
+        writeSuccess: false,
+        writeError: null,
+        writeRating: 0,
+        writeMediaFiles: [],
+        writeMediaUploaded: null,
+      });
       return;
     }
 
@@ -345,6 +363,16 @@ export function mountWidget(el: HTMLElement) {
 
     if (action === "set-write-rating") {
       store.setState({ writeRating: Number(target.dataset.value) });
+      return;
+    }
+
+    if (action === "remove-write-media") {
+      const index = Number(target.dataset.index);
+      const current = store.getState().writeMediaFiles;
+      const removed = current[index];
+      if (removed) revokePreviewUrl(removed);
+      const files = current.filter((_, i) => i !== index);
+      store.setState({ writeMediaFiles: files, writeMediaUploaded: null });
       return;
     }
 
@@ -399,6 +427,23 @@ export function mountWidget(el: HTMLElement) {
       const value = (target as HTMLSelectElement).value as WidgetState["sort"];
       store.setState({ sort: value });
       await refetchFiltered();
+      return;
+    }
+
+    if (target.dataset.action === "add-write-media") {
+      const input = target as HTMLInputElement;
+      const picked = Array.from(input.files ?? []);
+      const current = store.getState().writeMediaFiles;
+      const merged = [...current, ...picked].slice(0, MAX_MEDIA_PER_REVIEW);
+      const dropped = current.length + picked.length - merged.length;
+      store.setState({
+        writeMediaFiles: merged,
+        writeMediaUploaded: null,
+        writeError:
+          dropped > 0
+            ? `You can attach up to ${MAX_MEDIA_PER_REVIEW} files, ${dropped} file${dropped === 1 ? "" : "s"} not added.`
+            : null,
+      });
     }
   });
 
@@ -420,7 +465,24 @@ export function mountWidget(el: HTMLElement) {
       if (typeof value === "string" && value) attributes[def.key] = value;
     }
 
-    store.setState({ writeSubmitting: true, writeError: null });
+    store.setState({ writeError: null });
+
+    let media = state.writeMediaUploaded;
+    if (media === null && state.writeMediaFiles.length > 0) {
+      store.setState({ writeMediaUploading: true });
+      try {
+        media = await uploadReviewMedia(state.writeMediaFiles, (f) => presignMedia(apiBase, f));
+        store.setState({ writeMediaUploaded: media, writeMediaUploading: false });
+      } catch {
+        store.setState({
+          writeMediaUploading: false,
+          writeError: "One of your files failed to upload, remove it and try again.",
+        });
+        return;
+      }
+    }
+
+    store.setState({ writeSubmitting: true });
     try {
       await postReview(apiBase, {
         productSlug,
@@ -429,8 +491,15 @@ export function mountWidget(el: HTMLElement) {
         title: String(formData.get("title") ?? "") || undefined,
         body: String(formData.get("body") ?? ""),
         attributes,
+        media: media ?? [],
       });
-      store.setState({ writeSubmitting: false, writeSuccess: true });
+      revokeAllPreviewUrls(state.writeMediaFiles);
+      store.setState({
+        writeSubmitting: false,
+        writeSuccess: true,
+        writeMediaFiles: [],
+        writeMediaUploaded: null,
+      });
     } catch (err) {
       store.setState({
         writeSubmitting: false,

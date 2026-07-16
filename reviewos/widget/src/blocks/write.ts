@@ -1,5 +1,6 @@
 import type { WidgetState } from "../types";
 import { esc } from "../helpers";
+import { getPreviewUrl, MAX_MEDIA_PER_REVIEW } from "../media-upload";
 
 export function renderWriteModal(state: WidgetState): string {
   if (!state.writeOpen) return "";
@@ -41,6 +42,25 @@ export function renderWriteModal(state: WidgetState): string {
     ? `<div class="rvos-form-error">${esc(state.writeError)}</div>`
     : "";
 
+  const mediaPreviews = state.writeMediaFiles
+    .map((file, i) => {
+      const isImage = file.type.startsWith("image/");
+      const preview = isImage
+        ? `<img src="${getPreviewUrl(file)}" alt="${esc(file.name)}" class="rvos-media-preview__thumb" />`
+        : `<div class="rvos-media-preview__video-icon" aria-hidden="true">&#9654;</div>`;
+      return `
+        <div class="rvos-media-preview">
+          ${preview}
+          <span class="rvos-media-preview__name">${esc(file.name)}</span>
+          <button type="button" class="rvos-media-preview__remove" data-action="remove-write-media" data-index="${i}" aria-label="Remove ${esc(file.name)}" ${state.writeMediaUploading ? "disabled" : ""}>&times;</button>
+        </div>
+      `;
+    })
+    .join("");
+
+  const mediaSubmitting = state.writeMediaUploading;
+  const canAddMoreMedia = state.writeMediaFiles.length < MAX_MEDIA_PER_REVIEW;
+
   return `
     <div class="rvos-modal-overlay" data-action="close-write">
       <div class="rvos-modal" role="dialog" aria-modal="true">
@@ -72,9 +92,18 @@ export function renderWriteModal(state: WidgetState): string {
             <textarea name="body" required rows="4" maxlength="2000"></textarea>
           </label>
           ${attrFields}
+          <div class="rvos-field">
+            <span>Photos / videos (optional, up to ${MAX_MEDIA_PER_REVIEW})</span>
+            ${mediaPreviews ? `<div class="rvos-media-previews">${mediaPreviews}</div>` : ""}
+            ${
+              canAddMoreMedia
+                ? `<input type="file" data-action="add-write-media" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime" multiple ${mediaSubmitting ? "disabled" : ""} />`
+                : ""
+            }
+          </div>
           ${error}
-          <button type="submit" class="rvos-btn rvos-btn--primary" ${state.writeSubmitting ? "disabled" : ""}>
-            ${state.writeSubmitting ? "Submitting…" : "Submit review"}
+          <button type="submit" class="rvos-btn rvos-btn--primary" ${state.writeSubmitting || mediaSubmitting ? "disabled" : ""}>
+            ${mediaSubmitting ? "Uploading…" : state.writeSubmitting ? "Submitting…" : "Submit review"}
           </button>
         </form>
       </div>

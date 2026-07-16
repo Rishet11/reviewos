@@ -54,6 +54,7 @@ model Product {
   reviews          Review[]
   marketplaceStats MarketplaceStat[]
   aiSummaries      AiSummary[]
+  reviewRequests   ReviewRequest[]
 
   @@unique([shop, slug])
   @@index([shop])
@@ -74,6 +75,7 @@ model Review {
   merchantRepliedAt   DateTime?
   status              String    @default("approved")
   verifiedBuyer       Boolean   @default(false)
+  verifiedOrderId     String?
   verifiedMarketplace Boolean   @default(false)
   source              String    @default("website")
   attributes          String
@@ -86,13 +88,36 @@ model Review {
 }
 
 model ReviewMedia {
-  id        String   @id @default(cuid())
-  reviewId  String
-  review    Review   @relation(fields: [reviewId], references: [id])
-  type      String
-  url       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  reviewId      String
+  review        Review   @relation(fields: [reviewId], references: [id])
+  type          String
+  url           String
+  storageKey    String
+  mimeType      String
+  sizeBytes     Int
+  thumbnailUrl  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Tracks R2 objects uploaded via the presign flow before the parent review
+// exists. A review is created only after all its media finishes uploading,
+// so every presigned upload lands here first; createReview deletes the rows
+// it claims. Anything left after `sweepOrphanedMedia`'s cutoff means the
+// customer uploaded a file but never finished/submitted the review, so we
+// also delete the underlying R2 object.
+model PendingReviewMedia {
+  id         String   @id @default(cuid())
+  shop       String
+  storageKey String
+  url        String
+  mimeType   String
+  sizeBytes  Int
+  createdAt  DateTime @default(now())
+
+  @@index([shop])
+  @@index([createdAt])
 }
 
 model AttributeDefinition {
@@ -157,6 +182,94 @@ model AiSummary {
   updatedAt              DateTime @updatedAt
 
   @@unique([shop, productId, scope, cohortKey])
+  @@index([shop])
+}
+
+// ---- Phase 6 Slice B: verified-buyer / order linkage ----
+// Webhook-captured order data. `Review.verifiedOrderId` is a deliberate soft
+// reference (plain string, no @relation/FK) to OrderCapture.id, matching the
+// `MarketplaceStat.url`-as-plain-string convention for cross-cutting external
+// references - it lets OrderCapture rows be pruned/GDPR-redacted independently
+// with no cascade/constraint ordering to worry about.
+model OrderCapture {
+  id              String    @id @default(cuid())
+  shop            String
+  shopifyOrderId  String    // GID, e.g. gid://shopify/Order/6012345678901
+  orderName       String?
+  customerEmail   String?
+  customerId      String?
+  financialStatus String
+  paidAt          DateTime?
+  fulfilledAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  lineItems OrderLineItem[]
+
+  @@unique([shop, shopifyOrderId])
+  @@index([shop])
+  @@index([shop, customerEmail])
+}
+
+model OrderLineItem {
+  id               String       @id @default(cuid())
+  orderCaptureId   String
+  orderCapture     OrderCapture @relation(fields: [orderCaptureId], references: [id])
+  shopifyProductId String?
+  shopifyVariantId String?
+  title            String
+  quantity         Int
+
+  @@index([orderCaptureId])
+  @@index([shopifyProductId])
+}
+
+// ---- Phase 6 Slice C: post-purchase review-request email ----
+// One row per (shop, shopifyOrderId, productId): a line item worth asking
+// about. `orderCaptureId` is a soft reference (no @relation/FK), mirroring
+// `Review.verifiedOrderId` from Slice B - OrderCapture can be pruned/redacted
+// independently of these rows.
+model ReviewRequest {
+  id                String    @id @default(cuid())
+  shop              String
+  productId         String
+  product           Product   @relation(fields: [productId], references: [id])
+
+  shopifyOrderId    String
+  orderCaptureId    String?
+  shopifyCustomerId String?
+  customerEmail     String
+  customerName      String?
+
+  cohort            String    @default("first_time") // "first_time" | "repeat"
+  channel           String    @default("email")       // forward-compat slot for v1.1 WhatsApp/SMS, unused
+  deliveredAt       DateTime
+  scheduledSendAt   DateTime
+
+  status            String    @default("pending")     // pending | sent | converted | exhausted | suppressed | failed | canceled
+  sentCount         Int       @default(0)
+  lastSentAt        DateTime?
+  failedAttempts    Int       @default(0)
+  lastError         String?
+  completedReviewId String?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([shop, shopifyOrderId, productId])
+  @@index([shop])
+  @@index([shop, status, scheduledSendAt])
+}
+
+model EmailSuppression {
+  id        String   @id @default(cuid())
+  shop      String
+  email     String
+  reason    String   @default("unsubscribe") // unsubscribe | customer_redact | bounce
+  createdAt DateTime @default(now())
+
+  @@unique([shop, email])
   @@index([shop])
 }
 

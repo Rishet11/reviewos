@@ -46,13 +46,17 @@ model Review {
 }
 
 model ReviewMedia {
-  id        String   @id @default(cuid())
-  reviewId  String
-  review    Review   @relation(fields: [reviewId], references: [id])
-  type      String
-  url       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  reviewId      String
+  review        Review   @relation(fields: [reviewId], references: [id])
+  type          String
+  url           String
+  storageKey    String
+  mimeType      String
+  sizeBytes     Int
+  thumbnailUrl  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model AttributeDefinition {

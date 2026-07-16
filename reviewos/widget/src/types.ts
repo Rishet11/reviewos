@@ -99,4 +99,14 @@ export type WidgetState = {
   writeSubmitting: boolean;
   writeSuccess: boolean;
   writeError: string | null;
+
+  // Files the customer picked in the write-review form, in selection order
+  // (capped at MAX_MEDIA_PER_REVIEW client-side; server re-caps too).
+  writeMediaFiles: File[];
+  // Cache of already-uploaded results for the current writeMediaFiles set.
+  // Invalidated (set to null) whenever a file is added/removed. This lets a
+  // retry after a review-submission failure skip re-uploading files that
+  // already made it to storage.
+  writeMediaUploaded: import("./media-upload").UploadedMedia[] | null;
+  writeMediaUploading: boolean;
 };

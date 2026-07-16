@@ -18,9 +18,10 @@ function renderCard(review: Review, voted: boolean): string {
 
   const media = review.media.length
     ? `<div class="rvos-card__media">${review.media
-        .map(
-          (m) =>
-            `<img class="rvos-card__thumb" src="${esc(m.url)}" alt="review media" loading="lazy" />`
+        .map((m) =>
+          m.type === "video"
+            ? `<video class="rvos-card__thumb" src="${esc(m.url)}" muted preload="metadata"></video>`
+            : `<img class="rvos-card__thumb" src="${esc(m.url)}" alt="review media" loading="lazy" />`
         )
         .join("")}</div>`
     : "";

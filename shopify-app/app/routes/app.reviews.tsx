@@ -170,6 +170,38 @@ function ReviewRowCard({
         {review.title && <s-text type="strong">{review.title}</s-text>}
         <s-paragraph>{truncate(review.body, 120)}</s-paragraph>
 
+        {review.media.length > 0 && (
+          <s-stack direction="inline" gap="small">
+            {review.media.map((m) =>
+              m.type === "video" ? (
+                <a key={m.id} href={m.url} target="_blank" rel="noreferrer">
+                  <video
+                    src={m.url}
+                    muted
+                    preload="metadata"
+                    style={{
+                      width: "64px",
+                      height: "64px",
+                      objectFit: "cover",
+                      borderRadius: "4px",
+                    }}
+                  />
+                </a>
+              ) : (
+                <a key={m.id} href={m.url} target="_blank" rel="noreferrer">
+                  <img
+                    src={m.url}
+                    alt="Review media"
+                    width={64}
+                    height={64}
+                    style={{ objectFit: "cover", borderRadius: "4px" }}
+                  />
+                </a>
+              )
+            )}
+          </s-stack>
+        )}
+
         {review.merchantReply && (
           <s-box
             padding="base"

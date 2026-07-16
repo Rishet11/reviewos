@@ -22,7 +22,14 @@ import {
   fetchReviews,
   fetchSummary,
   postReview,
+  presignMedia,
 } from "./api";
+import {
+  uploadReviewMedia,
+  revokePreviewUrl,
+  revokeAllPreviewUrls,
+  MAX_MEDIA_PER_REVIEW,
+} from "../media-upload";
 import type { WidgetState } from "../types";
 
 const FILTERS_CHANGED_EVENT = "reviewos:filters-changed";
@@ -59,6 +66,9 @@ function blankState(productId: string, pageSize: number): WidgetState {
     writeSubmitting: false,
     writeSuccess: false,
     writeError: null,
+    writeMediaFiles: [],
+    writeMediaUploaded: null,
+    writeMediaUploading: false,
   };
 }
 
@@ -71,6 +81,10 @@ export function mountShopifyBlock(el: HTMLElement) {
     console.error("[reviewos] missing data-block or data-product-handle");
     return;
   }
+  // TS can't carry the `!productId` narrowing above into the nested async
+  // closures below (loadReviews, loadAiSummary, init), so capture a
+  // definitely-string binding here for use at those call sites.
+  const pid: string = productId;
   const apiBase = (el.dataset.apiBase || DEFAULT_API_BASE).replace(/\/$/, "");
   const pageSize = Number(el.dataset.pageSize) || DEFAULT_PAGE_SIZE;
 
@@ -125,7 +139,7 @@ export function mountShopifyBlock(el: HTMLElement) {
     store.setState({ reviewsLoading: true });
     try {
       const result = await fetchReviews(apiBase, {
-        productId,
+        productId: pid,
         rating: state.ratingFilter,
         attrFilters: state.attrFilters,
         sort: state.sort,
@@ -151,7 +165,7 @@ export function mountShopifyBlock(el: HTMLElement) {
     const seq = ++aiSummarySeq;
     store.setState({ aiSummaryLoading: true });
     try {
-      const summary = await fetchSummary(apiBase, productId, store.getState().attrFilters);
+      const summary = await fetchSummary(apiBase, pid, store.getState().attrFilters);
       if (seq !== aiSummarySeq) return;
       store.setState({ aiSummary: summary, aiSummaryLoading: false });
     } catch {
@@ -224,7 +238,15 @@ export function mountShopifyBlock(el: HTMLElement) {
       return;
     }
     if (action === "open-write") {
-      store.setState({ writeOpen: true, writeSuccess: false, writeError: null, writeRating: 0 });
+      revokeAllPreviewUrls(store.getState().writeMediaFiles);
+      store.setState({
+        writeOpen: true,
+        writeSuccess: false,
+        writeError: null,
+        writeRating: 0,
+        writeMediaFiles: [],
+        writeMediaUploaded: null,
+      });
       return;
     }
     if (action === "close-write") {
@@ -235,6 +257,15 @@ export function mountShopifyBlock(el: HTMLElement) {
       store.setState({ writeRating: Number(target.dataset.value) });
       return;
     }
+    if (action === "remove-write-media") {
+      const index = Number(target.dataset.index);
+      const current = store.getState().writeMediaFiles;
+      const removed = current[index];
+      if (removed) revokePreviewUrl(removed);
+      const files = current.filter((_, i) => i !== index);
+      store.setState({ writeMediaFiles: files, writeMediaUploaded: null });
+      return;
+    }
   });
 
   el.addEventListener("change", async (evt) => {
@@ -243,6 +274,22 @@ export function mountShopifyBlock(el: HTMLElement) {
       store.setState({ sort: (target as HTMLSelectElement).value as WidgetState["sort"] });
       pushFilters();
       await refetch();
+      return;
+    }
+    if (target.dataset.action === "add-write-media") {
+      const input = target as HTMLInputElement;
+      const picked = Array.from(input.files ?? []);
+      const current = store.getState().writeMediaFiles;
+      const merged = [...current, ...picked].slice(0, MAX_MEDIA_PER_REVIEW);
+      const dropped = current.length + picked.length - merged.length;
+      store.setState({
+        writeMediaFiles: merged,
+        writeMediaUploaded: null,
+        writeError:
+          dropped > 0
+            ? `You can attach up to ${MAX_MEDIA_PER_REVIEW} files, ${dropped} file${dropped === 1 ? "" : "s"} not added.`
+            : null,
+      });
     }
   });
 
@@ -262,7 +309,24 @@ export function mountShopifyBlock(el: HTMLElement) {
       const value = formData.get(`attr__${def.key}`);
       if (typeof value === "string" && value) attributes[def.key] = value;
     }
-    store.setState({ writeSubmitting: true, writeError: null });
+    store.setState({ writeError: null });
+
+    let media = state.writeMediaUploaded;
+    if (media === null && state.writeMediaFiles.length > 0) {
+      store.setState({ writeMediaUploading: true });
+      try {
+        media = await uploadReviewMedia(state.writeMediaFiles, (f) => presignMedia(apiBase, f));
+        store.setState({ writeMediaUploaded: media, writeMediaUploading: false });
+      } catch {
+        store.setState({
+          writeMediaUploading: false,
+          writeError: "One of your files failed to upload, remove it and try again.",
+        });
+        return;
+      }
+    }
+
+    store.setState({ writeSubmitting: true });
     try {
       await postReview(apiBase, {
         productId,
@@ -271,8 +335,15 @@ export function mountShopifyBlock(el: HTMLElement) {
         title: String(formData.get("title") ?? "") || undefined,
         body: String(formData.get("body") ?? ""),
         attributes,
+        media: media ?? [],
       });
-      store.setState({ writeSubmitting: false, writeSuccess: true });
+      revokeAllPreviewUrls(state.writeMediaFiles);
+      store.setState({
+        writeSubmitting: false,
+        writeSuccess: true,
+        writeMediaFiles: [],
+        writeMediaUploaded: null,
+      });
     } catch (err) {
       store.setState({
         writeSubmitting: false,
@@ -293,9 +364,9 @@ export function mountShopifyBlock(el: HTMLElement) {
       // /summary is the separate AI text summary and is not wired into any
       // block yet.
       const [distribution, attributeDefs, marketplaceStats] = await Promise.all([
-        needsSummary ? fetchDistribution(apiBase, productId) : Promise.resolve(null),
-        needsAttrs ? fetchAttributes(apiBase, productId) : Promise.resolve([]),
-        needsMarketplace ? fetchMarketplaceStats(apiBase, productId) : Promise.resolve([]),
+        needsSummary ? fetchDistribution(apiBase, pid) : Promise.resolve(null),
+        needsAttrs ? fetchAttributes(apiBase, pid) : Promise.resolve([]),
+        needsMarketplace ? fetchMarketplaceStats(apiBase, pid) : Promise.resolve([]),
       ]);
 
       store.setState({

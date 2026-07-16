@@ -7,3 +7,6 @@
 /build/
 .vercel
 .env*
+
+# Locally-stored review media uploads (Phase 6 Slice A demo storage backend)
+/public/uploads/

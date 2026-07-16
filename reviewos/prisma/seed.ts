@@ -330,6 +330,9 @@ async function createSeedReview(
           reviewId: review.id,
           type: "image",
           url: `https://picsum.photos/seed/${review.id}-${m}/500/500`,
+          storageKey: `seed/${review.id}-${m}`,
+          mimeType: "image/jpeg",
+          sizeBytes: 0,
         },
       });
     }

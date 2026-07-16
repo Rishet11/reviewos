@@ -1,5 +1,6 @@
 import { prisma } from "./db.server";
 import { REVIEW_STATUSES, type ReviewStatus } from "./review-status";
+import { MAX_MEDIA_PER_REVIEW } from "./media.server";
 
 export { REVIEW_STATUSES, type ReviewStatus };
 
@@ -140,6 +141,14 @@ export async function getRatingSummary(shop: string, productSlug: string) {
   return { average, count, byStar };
 }
 
+export type CreateReviewMediaInput = {
+  type: string;
+  url: string;
+  storageKey?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+};
+
 export type CreateReviewInput = {
   productId: string;
   customerName: string;
@@ -151,23 +160,83 @@ export type CreateReviewInput = {
   source?: string;
   status?: string;
   createdAt?: Date;
+  media?: CreateReviewMediaInput[];
+  verifiedBuyer?: boolean;
+  verifiedOrderId?: string | null;
 };
 
 export async function createReview(shop: string, data: CreateReviewInput) {
-  return prisma.review.create({
-    data: {
-      shop,
-      productId: data.productId,
-      customerName: data.customerName,
-      customerEmail: data.customerEmail,
-      rating: data.rating,
-      title: data.title,
-      body: data.body,
-      attributes: data.attributes ?? "{}",
-      source: data.source ?? "website",
-      status: data.status ?? "pending",
-      ...(data.createdAt ? { createdAt: data.createdAt } : {}),
-    },
+  // Server-side cap regardless of what the client sent - never trust the
+  // client's own count.
+  const media = (data.media ?? []).slice(0, MAX_MEDIA_PER_REVIEW);
+
+  return prisma.$transaction(async (tx) => {
+    // Ownership check: every claimed media item must correspond to a
+    // PendingReviewMedia row this shop actually presigned (recorded by
+    // proxy.media.presign.tsx). Without this, the URL-prefix check alone
+    // only proves a URL points at our R2 bucket, not that this customer
+    // uploaded it - anyone could attach an already-public media URL
+    // (another shop's, or another review's) to their own review. A
+    // storageKey that isn't in PendingReviewMedia has either never been
+    // uploaded through this shop's presign flow or was already claimed by
+    // another review, so it's rejected either way.
+    if (media.length > 0) {
+      const storageKeys = media.map((m) => m.storageKey);
+      if (storageKeys.some((k) => !k)) {
+        throw new Error("invalid_media: missing storage key");
+      }
+      const pending = await tx.pendingReviewMedia.findMany({
+        where: { shop, storageKey: { in: storageKeys as string[] } },
+      });
+      const foundKeys = new Set(pending.map((p) => p.storageKey));
+      if (storageKeys.some((k) => !foundKeys.has(k as string))) {
+        throw new Error("invalid_media: unclaimed storage key");
+      }
+    }
+
+    const review = await tx.review.create({
+      data: {
+        shop,
+        productId: data.productId,
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        rating: data.rating,
+        title: data.title,
+        body: data.body,
+        attributes: data.attributes ?? "{}",
+        source: data.source ?? "website",
+        status: data.status ?? "pending",
+        verifiedBuyer: data.verifiedBuyer ?? false,
+        verifiedOrderId: data.verifiedOrderId ?? null,
+        ...(data.createdAt ? { createdAt: data.createdAt } : {}),
+      },
+    });
+
+    if (media.length > 0) {
+      await tx.reviewMedia.createMany({
+        data: media.map((m) => ({
+          reviewId: review.id,
+          type: m.type,
+          url: m.url,
+          storageKey: m.storageKey ?? "",
+          mimeType: m.mimeType ?? "",
+          sizeBytes: m.sizeBytes ?? 0,
+        })),
+      });
+
+      // Un-orphan the storage objects this review just claimed.
+      const storageKeys = media.map((m) => m.storageKey).filter((k): k is string => !!k);
+      if (storageKeys.length > 0) {
+        await tx.pendingReviewMedia.deleteMany({
+          where: { shop, storageKey: { in: storageKeys } },
+        });
+      }
+    }
+
+    return tx.review.findUniqueOrThrow({
+      where: { id: review.id },
+      include: { media: true },
+    });
   });
 }
 
