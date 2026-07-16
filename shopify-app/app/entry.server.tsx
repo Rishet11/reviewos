@@ -2,9 +2,30 @@ import { PassThrough } from "stream";
 import { renderToPipeableStream } from "react-dom/server";
 import { ServerRouter } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
-import { type EntryContext } from "react-router";
+import { type EntryContext, type HandleErrorFunction } from "react-router";
 import { isbot } from "isbot";
+import * as Sentry from "@sentry/react-router";
 import { addDocumentResponseHeaders } from "./shopify.server";
+
+// Server-only error reporting. A missing/empty SENTRY_DSN is a complete
+// no-op: Sentry is never initialized and captureException is never called.
+const SENTRY_DSN = process.env.SENTRY_DSN || "";
+
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    tracesSampleRate: 0,
+  });
+}
+
+export const handleError: HandleErrorFunction = (error, { request }) => {
+  if (!request.signal.aborted) {
+    if (SENTRY_DSN) {
+      Sentry.captureException(error);
+    }
+    console.error(error);
+  }
+};
 
 export const streamTimeout = 5000;
 
@@ -45,6 +66,9 @@ export default async function handleRequest(
         },
         onError(error) {
           responseStatusCode = 500;
+          if (SENTRY_DSN) {
+            Sentry.captureException(error);
+          }
           console.error(error);
         },
       }
