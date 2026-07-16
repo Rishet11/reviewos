@@ -10,6 +10,7 @@ const mockPrisma = {
   marketplaceStat: {
     upsert: vi.fn(),
     deleteMany: vi.fn(),
+    findMany: vi.fn(),
   },
   product: {
     findUnique: vi.fn(),
@@ -19,9 +20,8 @@ const mockPrisma = {
 
 vi.mock("./db.server", () => ({ prisma: mockPrisma }));
 
-const { listSources, upsertSource, deleteSource, upsertStat, deleteStat } = await import(
-  "./marketplace.server"
-);
+const { listSources, upsertSource, deleteSource, upsertStat, deleteStat, getMarketplaceStats } =
+  await import("./marketplace.server");
 
 describe("listSources", () => {
   it("scopes by shop", async () => {
@@ -133,5 +133,52 @@ describe("upsertStat", () => {
         url: "https://amazon.com/dp/x",
       },
     });
+  });
+});
+
+describe("getMarketplaceStats", () => {
+  it("returns an empty array for an unknown product slug in that shop, without querying stats", async () => {
+    mockPrisma.product.findUnique.mockResolvedValue(null);
+
+    const result = await getMarketplaceStats("shop1.myshopify.com", "nonexistent-product");
+
+    expect(result).toEqual([]);
+    expect(mockPrisma.marketplaceStat.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns shop-scoped stats for a product in the given shop", async () => {
+    mockPrisma.product.findUnique.mockResolvedValue({
+      id: "prod_1",
+      shop: "shop1.myshopify.com",
+      slug: "some-product",
+    });
+    mockPrisma.marketplaceStat.findMany.mockResolvedValue([
+      {
+        id: "stat_1",
+        rating: 4.6,
+        reviewCount: 12431,
+        url: "https://amazon.com/dp/x",
+        source: { name: "Amazon", logoUrl: "", baseUrl: "https://amazon.com" },
+      },
+    ]);
+
+    const result = await getMarketplaceStats("shop1.myshopify.com", "some-product");
+
+    expect(mockPrisma.product.findUnique).toHaveBeenCalledWith({
+      where: { shop_slug: { shop: "shop1.myshopify.com", slug: "some-product" } },
+    });
+    expect(mockPrisma.marketplaceStat.findMany).toHaveBeenCalledWith({
+      where: { shop: "shop1.myshopify.com", productId: "prod_1" },
+      include: { source: true },
+    });
+    expect(result).toEqual([
+      {
+        id: "stat_1",
+        rating: 4.6,
+        reviewCount: 12431,
+        url: "https://amazon.com/dp/x",
+        source: { name: "Amazon", logoUrl: "", baseUrl: "https://amazon.com" },
+      },
+    ]);
   });
 });
