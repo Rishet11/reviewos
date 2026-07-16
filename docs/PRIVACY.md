@@ -73,4 +73,4 @@ This section governs the processing relationship between the merchant and Review
 
 ## 8. Contact
 
-Privacy questions, access requests, or deletion requests: **privacy@reviewos.app** (placeholder address, to be confirmed and activated before public launch).
+Privacy questions, access requests, or deletion requests: **rishetmehra11@gmail.com**. Published publicly at `/privacy` on the app domain (https://reviewos-6p4p.onrender.com/privacy).
