@@ -1,20 +1,53 @@
-# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+# Production app config (Render). Dev uses shopify.app.toml.
+# Deliberately omits the template's demo_info metafield and example
+# metaobject definitions so they never land on merchant stores.
 
 client_id = "4d89e9f395a278d509a5528c42d7a740"
-application_url = "https://shopify.dev/apps/default-app-home"
-embedded = true
 name = "ReviewOS"
+application_url = "https://reviewos-6p4p.onrender.com"
+embedded = true
+
+[access_scopes]
+scopes = "write_products,write_metaobjects,write_metaobject_definitions,read_orders"
 
 [webhooks]
 api_version = "2026-10"
 
-[access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = [ "app/uninstalled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = [ "app/scopes_update" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = [ "orders/paid" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/fulfilled"
+  topics = [ "orders/fulfilled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/cancelled"
+  topics = [ "orders/cancelled" ]
+
+  [[webhooks.subscriptions]]
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
+  uri = "/webhooks/compliance"
+
+[app_proxy]
+url = "https://reviewos-6p4p.onrender.com/proxy"
+prefix = "apps"
+subpath = "reviewos"
 
 [auth]
-redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
+redirect_urls = [
+  "https://reviewos-6p4p.onrender.com/auth/callback",
+  "https://reviewos-6p4p.onrender.com/auth/session-token"
+]
 
 [build]
-include_config_on_deploy = true
-automatically_update_urls_on_dev = true
+# Never let a dev session rewrite production URLs.
+automatically_update_urls_on_dev = false
