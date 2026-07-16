@@ -1,18 +1,21 @@
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, redirect, useLoaderData, useRouteError } from "react-router";
+import { Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate, BILLING_PLANS, BILLING_TEST } from "../shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { billing } = await authenticate.admin(request);
+  const { billing, redirect } = await authenticate.admin(request);
 
   const url = new URL(request.url);
   if (url.pathname !== "/app/billing") {
     await billing.require({
       plans: [...BILLING_PLANS],
       isTest: BILLING_TEST,
+      // Use the App Bridge-aware redirect from authenticate.admin so the embedded
+      // host/id_token params survive; a plain react-router redirect drops them and
+      // the iframe bounce renders a bare status code instead of the billing page.
       onFailure: async () => redirect("/app/billing"),
     });
   }
