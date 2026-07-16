@@ -21,13 +21,20 @@ api_version = "2026-10"
   uri = "/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
 
-  # orders/paid, orders/fulfilled, orders/cancelled subscriptions are
-  # TEMPORARILY OMITTED: this app has not yet been granted protected
-  # customer data access, and Shopify rejects version creation with
-  # these topics until it is (verified 2026-07-16). The webhook routes
-  # exist and are tested; re-add these three subscriptions and redeploy
-  # once access is approved via the Partner Dashboard. Until then,
-  # verified-buyer badges and review-request emails are inactive in prod.
+  # orders/* re-enabled 2026-07-17 after selecting protected-customer-data
+  # use (Email field, reasons App functionality + Marketing/advertising) in
+  # the Partner Dashboard Step 1 — grants dev-store access without full review.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/paid"
+  topics = [ "orders/paid" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/fulfilled"
+  topics = [ "orders/fulfilled" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/cancelled"
+  topics = [ "orders/cancelled" ]
 
   [[webhooks.subscriptions]]
   compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
