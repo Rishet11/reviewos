@@ -19,12 +19,12 @@ Exit: `shopify auth login` works; dev store exists. ✔
 `shopify app init` (React Router 7 template) → `shopify app dev` → installed on dev store; embedded admin renders; hello-world theme app block visible on product page; App Proxy `/apps/reviewos/status` returns JSON. Lives in `shopify-app/`. Verified live (admin screenshot, block on product page, curl 200 JSON). Committed on branch `phase-1-shopify-skeleton`.
 Exit: screenshot of admin + block on product page. ✔
 
-## Phase 2 — Review core (data + admin)
+## Phase 2 — Review core (data + admin) — DONE (2026-07-14)
 Prisma models (Review, ReviewMedia, AttributeDefinition, MarketplaceSource/Stat/Review, AiSummary, Settings); services in `app/services/`; moderation queue + attribute manager + settings in Polaris admin; seed script.
 - [ ] [USER-adjacent] Request Shopify protected-customer-data access when models first touch customer/order data; Shopify-gated approval with lead time; Phase 6 verified-buyer depends on it.
 Exit: create/moderate/reply to reviews in admin; typecheck + service tests pass.
 
-## Phase 3 — Storefront widget v1
+## Phase 3 — Storefront widget v1 — DONE (2026-07-15, live-verified in theme editor)
 Entry check: verify on shopify.dev that multiple app blocks coexist on one product template given the 1-resource-setting-per-type limit, before building all 8 blocks.
 App blocks: review-feed, rating-distribution, star-badge, write-review (attribute-driven form), filter-chips (dynamic, URL-synced). App Proxy endpoints with pagination/filtering. Scoped CSS, schema settings per block.
 Exit: full submit→moderate→display loop on dev store; blocks reorder/configure in Theme Editor.
@@ -43,20 +43,20 @@ Adapter interface `app/services/marketplace/providers/` (provider contract: fetc
 Not included in App Store submission builds; post-approval opt-in only (see PRD Live fetch risk).
 Exit: with a provider key entered via the admin settings UI (stored per-shop) and the shop flag on, marketplace data populates for a test product without CSV; flag off hides the connector entirely.
 
-## Phase 6 — Media & collection
+## Phase 6 — Media & collection — DONE (2026-07-16); code-complete + migrated; live E2E tests + external creds (R2/Resend) outstanding
 R2 (or Shopify Files) photo/video upload on write-review; post-purchase review-request email with verified deep link; verified-buyer badge from order linkage. Review-request email: default timing 3-5 days post-delivery with purchase-recency cohort triggers, max 3 touches per customer. WhatsApp review requests via merchant-authenticated WhatsApp Business API as v1.1; SMS after that.
 - [ ] [USER] Place a test order on the dev store (needed for verified-buyer + review-request email tests).
 Exit: photo review submitted from storefront displays in gallery; request email fires on test order.
 
-## Phase 7a — Billing API
+## Phase 7a — Billing API — CODE DONE (2026-07-15); test charge not yet run
 Free + paid plan, trial.
 Exit: test charge succeeds on dev store.
 
-## Phase 7b — GDPR webhooks
+## Phase 7b — GDPR webhooks — DONE (2026-07-15)
 Customers/redact, customers/data_request, shop/redact respond 200 and perform the action. (Note: protected-customer-data approval was requested back in Phase 2.)
 Exit: webhook test suite passes.
 
-## Phase 7c — Standard review metaobject
+## Phase 7c — Standard review metaobject — DONE (2026-07-15)
 Standard review metaobject + reviews.rating / reviews.rating_count metafield sync, including a backfill script for all reviews created in earlier phases.
 Exit: metafields visible on product; backfill idempotent on rerun.
 
@@ -69,7 +69,7 @@ Storefront Lighthouse impact ≤10 points.
 Exit: Lighthouse impact ≤10 points.
 
 ## Phase 8 — Production & submission
-Postgres migration (Neon/Render), deploy (Render or Fly), R2 config, error monitoring, Redis + BullMQ provisioning, App Store listing assets, submit for review.
+production DB setup (Neon prod branch + connection pooling check), deploy (Render or Fly), R2 config, error monitoring, Redis + BullMQ provisioning, App Store listing assets, submit for review.
 - [ ] [USER] App listing assets: icon, screenshots, listing copy, support contact; complete submission form.
 Exit: app live on prod URL, submission sent.
 
