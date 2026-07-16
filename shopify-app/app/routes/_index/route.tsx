@@ -21,9 +21,10 @@ export default function App() {
   return (
     <div className={styles.index}>
       <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
+        <h1 className={styles.heading}>ReviewOS</h1>
         <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
+          AI-first product reviews for Shopify: filter-aware summaries,
+          merchant-defined review attributes, and marketplace trust badges.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
@@ -39,16 +40,18 @@ export default function App() {
         )}
         <ul className={styles.list}>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Filter-aware AI summaries</strong>. The review summary
+            rewrites itself for the cohort a shopper selects, powered by your
+            own custom review attributes.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Marketplace trust badges</strong>. Show your Amazon,
+            Flipkart, or Nykaa ratings on your own store, with link-outs.
           </li>
           <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
+            <strong>Verified reviews on autopilot</strong>. Post-purchase
+            review requests, verified-buyer badges, photo and video uploads,
+            and a full moderation queue.
           </li>
         </ul>
       </div>
