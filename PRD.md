@@ -11,7 +11,7 @@ D2C brands (initially India-focused, hence Flipkart/Nykaa/Smytten) that sell on 
 
 ## Differentiators (build moat here)
 1. **Filter-aware AI summaries** — summary regenerates for the shopper's selected cohort (merchant-defined attributes).
-2. **Marketplace trust aggregation — dual-mode.** Default (App-Store-safe): merchant-owned data via manual entry + CSV import of their own marketplace review exports. Optional (off by default, flag-gated, BYO API key): live-fetch connector through pluggable third-party providers (Unwrangle, Real Data API for Flipkart/amazon.in). Both fill the same tables and power trust badges, link-outs, and per-marketplace AI summaries ("What Amazon customers say").
+2. **Marketplace trust aggregation — dual-mode.** Default (App-Store-safe): merchant-owned data via manual entry + CSV import of their own marketplace review exports. Optional (off by default, flag-gated, BYO API key): live-fetch connector through pluggable third-party providers (Unwrangle, Real Data API for Flipkart/amazon.in). Both fill the same tables and power trust badges, link-outs, and per-marketplace AI summaries ("What Amazon customers say"). Staleness monitoring via weekly cron reminders (Pro tier, kill-switched provider skeleton).
 
    **Live fetch risk (stakeholder-accepted):** marketplace ToS prohibit scraping and vendor ToS prohibit redistribution (details + sources in docs/RESEARCH.md). The Phase 5b live-fetch connector is designed and flag-gated but NOT built; it will never be included in App Store submission builds. It would ship behind a per-shop and global kill switch with the merchant supplying their own vendor key, and liability for that vendor choice sits with the merchant. This risk was disclosed and the stakeholder chose to include the feature. If live-fetch never ships publicly, the v1 moat is cohort AI summaries, category-agnostic attribute engine, and native metaobject compliance.
 3. **Category-agnostic attribute engine** — merchants define unlimited custom attributes (skin type, shoe use, battery concern); filters, review form fields, and AI cohorts all derive from them. Zero hardcoding.
@@ -19,8 +19,8 @@ D2C brands (initially India-focused, hence Flipkart/Nykaa/Smytten) that sell on 
 
 ## Core features (v1, sellable)
 - Review CRUD: rating, title, body, photos/videos (R2 storage), helpful votes, merchant replies, verified-buyer badge (order-linked), status workflow (auto-approve / manual / reject / escalate rules).
-- Review collection: post-purchase email request with deep-link form (order-verified).
-- AI service: overall + per-marketplace + cohort summaries (cached, threshold-gated, regenerated via background job on approval), sentiment/tag extraction, AI demo-review generator (dev/demo tooling, clearly labeled — never fake reviews in production stores).
+- Review collection: post-purchase email request with deep-link form (order-verified); SMS/WhatsApp review request blast from past buyers (free plan 200/mo cap, Pro tier channels).
+- AI service: overall + per-marketplace + cohort summaries (cached, threshold-gated, regenerated via background job on approval), sentiment/tag extraction, AI demo-review generator (dev/demo tooling, clearly labeled; never fake reviews in production stores).
 - Storefront: Theme App Extension app blocks (ai-summary, rating-distribution, marketplace-ratings, ugc-gallery, filter-chips, review-feed, write-review, star-badge), each configurable in Theme Editor; App Proxy data; URL-synced filters.
 - Admin (Polaris, embedded): moderation queue, attribute manager, marketplace data manager (manual + CSV import), settings, AI controls.
 - Commercial plumbing: Billing API (free plan + paid tier, trial), GDPR webhooks, protected-customer-data compliance, review import from Judge.me/Loox exports (migration lever).

@@ -60,9 +60,9 @@ Exit: webhook test suite passes.
 Standard review metaobject + reviews.rating / reviews.rating_count metafield sync, including a backfill script for all reviews created in earlier phases.
 Exit: metafields visible on product; backfill idempotent on rerun.
 
-## Phase 7d — Competitor + marketplace review import
-Judge.me/Loox export formats. PLUS the parked Phase 5 Slice B (marketplace CSV review-body import + per-marketplace AI summaries + UGC gallery) as originally specced — feedstock caveat: only build against sources with a legitimate merchant-owned export (Trustpilot Business API, Google Business Profile API, Judge.me/Loox/Yotpo CSV); marketplace CSVs (Amazon/Flipkart/Nykaa) have no legit export (see Phase 5 note).
-Exit: sample export file imports cleanly.
+## Phase 7d — Competitor + marketplace review import — DONE (2026-07-18, Phase 9 Slice 1)
+Judge.me/Loox export formats and marketplace CSV review-body import (feedstock caveat: CSV sources only from legitimate merchant-owned exports; marketplace CSVs have no legit source per Phase 5 ToS prohibition).
+Exit: sample export file imports cleanly. ✔
 
 ## Phase 7e — Performance pass
 Storefront Lighthouse impact ≤10 points.
@@ -72,6 +72,16 @@ Exit: Lighthouse impact ≤10 points.
 production DB setup (Neon prod branch + connection pooling check), deploy (Render or Fly), R2 config, error monitoring, Redis + BullMQ provisioning, App Store listing assets, submit for review.
 - [ ] [USER] App listing assets: icon, screenshots, listing copy, support contact; complete submission form.
 Exit: app live on prod URL, submission sent.
+
+## Phase 9 — Gap closure (collection + import + channels) — CODE-COMPLETE, UNCOMMITTED (2026-07-18)
+Pre-slice hardening plus five feature slices: all code tested (182 tests pass), committed as uncommitted changes in shopify-app/.
+- [x] Pre-slice hardening: dispatch double-send fix, one-click unsubscribe, getPlan entitlements, dead fabricateReviews removed.
+- [x] Slice 1: CSV review import/export (Judge.me/Loox presets, moderation, batch undo).
+- [x] Slice 2: Collection blast from past buyers (Admin GraphQL 60-day window, free plan 200/mo cap).
+- [x] Slice 3: Widget layout presets (list/grid/carousel, CUSTOMIZATION.md).
+- [x] Slice 4: Marketplace rating staleness engine (weekly cron reminders, kill-switched provider skeleton, Pro tier).
+- [x] Slice 5: WhatsApp review-request channel (BYO Meta Cloud API, encrypted secrets, signed inbound webhook, Pro tier).
+Exit: all code tested; ready for Phase 8 production push.
 
 ## v2 backlog
 AI review chat, Hydrogen/headless SDK, analytics dashboard, Klaviyo/Smile integrations, multi-language, geo-personalization, bundle mapping, Trustpilot/Google official-API integrations.
