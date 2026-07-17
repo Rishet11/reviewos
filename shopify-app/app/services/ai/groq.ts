@@ -1,10 +1,4 @@
-import type {
-  AiProvider,
-  SummaryInput,
-  SummaryOutput,
-  FabricateReviewsInput,
-  FabricatedReview,
-} from "./provider";
+import type { AiProvider, SummaryInput, SummaryOutput } from "./provider";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "llama-3.3-70b-versatile";
@@ -66,38 +60,4 @@ Rules: pros and cons are each 2-4 short phrases drawn only from what reviewers a
   };
 }
 
-async function fabricateReviews(input: FabricateReviewsInput): Promise<FabricatedReview[]> {
-  const attrLines = input.attributeDefs
-    .map((a) => `- ${a.key} (${a.label}): one of [${a.options.join(", ")}]`)
-    .join("\n") || "(no attributes defined for this product)";
-
-  const prompt = `Generate ${input.count} realistic, varied customer reviews for this product:
-
-Name: ${input.productName}
-Category: ${input.productCategory}
-Description: ${input.productDescription}
-
-Available attributes reviewers may report on:
-${attrLines}
-
-Return strict JSON: {"reviews": [{"customerName": "First L.", "rating": 1-5, "title": "short title", "body": "2-4 sentences, realistic tone", "attributes": {"key": "chosen option value"}, "daysAgo": 1-180}, ...]}
-
-Rules: vary ratings (mostly 4-5, a couple of 2-3), vary tone and length, only include attribute keys from the list above with values from their given options, use plausible but generic names, no markdown.`;
-
-  const parsed = await chatJSON(prompt);
-  const reviews = Array.isArray(parsed.reviews) ? parsed.reviews : [];
-
-  return reviews
-    .filter((r: any) => r && typeof r.body === "string" && typeof r.rating === "number")
-    .map((r: any) => ({
-      customerName: typeof r.customerName === "string" ? r.customerName : "Anonymous",
-      rating: Math.min(5, Math.max(1, Math.round(r.rating))),
-      title: typeof r.title === "string" ? r.title : "",
-      body: r.body,
-      attributes:
-        r.attributes && typeof r.attributes === "object" ? r.attributes : {},
-      daysAgo: typeof r.daysAgo === "number" ? r.daysAgo : 30,
-    }));
-}
-
-export const groqProvider: AiProvider = { generateSummary, fabricateReviews };
+export const groqProvider: AiProvider = { generateSummary };

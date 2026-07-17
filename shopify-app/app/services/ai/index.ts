@@ -12,4 +12,4 @@ export function getAiProvider(): AiProvider {
   return provider;
 }
 
-export type { AiProvider, SummaryInput, SummaryOutput, FabricateReviewsInput, FabricatedReview } from "./provider";
+export type { AiProvider, SummaryInput, SummaryOutput } from "./provider";
