@@ -15,11 +15,14 @@ const mockPrisma = {
   settings: {
     findUnique: vi.fn(),
   },
+  whatsAppConnection: {
+    findUnique: vi.fn(),
+  },
 };
 
 vi.mock("./db.server", () => ({ prisma: mockPrisma }));
 
-const { createReviewRequestsForOrder } = await import("./review-requests.server");
+const { createReviewRequestsForOrder, resolveChannel } = await import("./review-requests.server");
 
 const BASE_INPUT = {
   shopifyOrderId: "gid://shopify/Order/1",
@@ -36,6 +39,7 @@ beforeEach(() => {
   mockPrisma.reviewRequest.findFirst.mockResolvedValue(null);
   mockPrisma.reviewRequest.findMany.mockResolvedValue([]);
   mockPrisma.settings.findUnique.mockResolvedValue(null);
+  mockPrisma.whatsAppConnection.findUnique.mockResolvedValue(null);
   mockPrisma.product.findMany.mockResolvedValue([
     { id: "prod_1", shopifyProductId: "gid://shopify/Product/1" },
   ]);
@@ -193,5 +197,42 @@ describe("createReviewRequestsForOrder", () => {
 
     expect(result).toEqual({ created: 0 });
     expect(mockPrisma.reviewRequest.upsert).toHaveBeenCalledTimes(1); // still upserts, just doesn't count as new
+  });
+});
+
+describe("resolveChannel", () => {
+  it("returns email when there's no phone, regardless of preference", async () => {
+    mockPrisma.settings.findUnique.mockResolvedValue({ value: "whatsapp" });
+    mockPrisma.whatsAppConnection.findUnique.mockResolvedValue({ enabled: true });
+
+    expect(await resolveChannel("shop1.myshopify.com", false)).toBe("email");
+    expect(mockPrisma.settings.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("returns email when there's a phone but preference isn't whatsapp", async () => {
+    mockPrisma.settings.findUnique.mockResolvedValue(null);
+
+    expect(await resolveChannel("shop1.myshopify.com", true)).toBe("email");
+  });
+
+  it("returns email when preference is whatsapp but there's no connection", async () => {
+    mockPrisma.settings.findUnique.mockResolvedValue({ value: "whatsapp" });
+    mockPrisma.whatsAppConnection.findUnique.mockResolvedValue(null);
+
+    expect(await resolveChannel("shop1.myshopify.com", true)).toBe("email");
+  });
+
+  it("returns email when preference is whatsapp, connection exists but is disabled", async () => {
+    mockPrisma.settings.findUnique.mockResolvedValue({ value: "whatsapp" });
+    mockPrisma.whatsAppConnection.findUnique.mockResolvedValue({ enabled: false });
+
+    expect(await resolveChannel("shop1.myshopify.com", true)).toBe("email");
+  });
+
+  it("returns whatsapp only when phone + preference + enabled connection all line up", async () => {
+    mockPrisma.settings.findUnique.mockResolvedValue({ value: "whatsapp" });
+    mockPrisma.whatsAppConnection.findUnique.mockResolvedValue({ enabled: true });
+
+    expect(await resolveChannel("shop1.myshopify.com", true)).toBe("whatsapp");
   });
 });

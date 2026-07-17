@@ -38,6 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         shopifyCustomerId: order.customerId,
         customerEmail: order.customerEmail,
         customerName: null,
+        customerPhone: order.customerPhone,
         deliveredAt: fulfilledAt,
         lineItems: order.lineItems,
       });

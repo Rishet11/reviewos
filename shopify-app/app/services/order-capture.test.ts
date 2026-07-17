@@ -18,7 +18,7 @@ const mockPrisma = {
 
 vi.mock("./db.server", () => ({ prisma: mockPrisma }));
 
-const { captureOrder, markOrderFulfilled, cancelOrderCapture } = await import(
+const { captureOrder, markOrderFulfilled, cancelOrderCapture, normalizeE164 } = await import(
   "./order-capture.server"
 );
 
@@ -203,5 +203,68 @@ describe("cancelOrderCapture", () => {
     expect(result).toBeNull();
     expect(mockPrisma.orderCapture.update).not.toHaveBeenCalled();
     expect(mockPrisma.review.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizeE164", () => {
+  it("keeps a well-formed +<digits> number", () => {
+    expect(normalizeE164("+15551234567")).toBe("+15551234567");
+  });
+
+  it("strips spaces, dashes and parens", () => {
+    expect(normalizeE164("+1 (555) 123-4567")).toBe("+15551234567");
+  });
+
+  it("returns null for a leading-0 domestic number (no safe country code to assume)", () => {
+    expect(normalizeE164("07911123456")).toBeNull();
+  });
+
+  it("returns null for junk input", () => {
+    expect(normalizeE164("not a phone number")).toBeNull();
+  });
+
+  it("returns null for empty/absent input", () => {
+    expect(normalizeE164(null)).toBeNull();
+    expect(normalizeE164(undefined)).toBeNull();
+    expect(normalizeE164("")).toBeNull();
+  });
+});
+
+describe("captureOrder phone capture (Slice 5)", () => {
+  beforeEach(() => {
+    mockPrisma.orderCapture.upsert.mockResolvedValue({ id: "order_1" });
+    mockPrisma.orderLineItem.deleteMany.mockResolvedValue({ count: 0 });
+    mockPrisma.orderLineItem.createMany.mockResolvedValue({ count: 0 });
+  });
+
+  it("resolves phone preferring customer.phone, then top-level, then shipping_address", async () => {
+    await captureOrder("shop1.myshopify.com", {
+      admin_graphql_api_id: "gid://shopify/Order/1",
+      financial_status: "paid",
+      customer: { phone: "+15551110000" },
+      phone: "+15552220000",
+      shipping_address: { phone: "+15553330000" },
+      line_items: [],
+    });
+
+    expect(mockPrisma.orderCapture.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ customerPhone: "+15551110000" }),
+      }),
+    );
+  });
+
+  it("writes customerPhone: null when no phone is present anywhere (zero behavior change)", async () => {
+    await captureOrder("shop1.myshopify.com", {
+      admin_graphql_api_id: "gid://shopify/Order/1",
+      financial_status: "paid",
+      line_items: [],
+    });
+
+    expect(mockPrisma.orderCapture.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ customerPhone: null }),
+      }),
+    );
   });
 });

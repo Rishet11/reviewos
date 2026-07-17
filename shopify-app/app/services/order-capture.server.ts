@@ -13,7 +13,13 @@ export type OrderWebhookPayload = {
   admin_graphql_api_id: string;
   name?: string | null;
   email?: string | null;
-  customer?: { email?: string | null; admin_graphql_api_id?: string | null } | null;
+  phone?: string | null;
+  customer?: {
+    email?: string | null;
+    phone?: string | null;
+    admin_graphql_api_id?: string | null;
+  } | null;
+  shipping_address?: { phone?: string | null } | null;
   financial_status?: string | null;
   line_items?: Array<{
     product_id?: string | number | null;
@@ -23,18 +29,42 @@ export type OrderWebhookPayload = {
   }> | null;
 };
 
+// Slice 5: best-effort E.164 normalization for whatever phone shape a
+// webhook payload carries. Strips spaces/dashes/parens; keeps a leading "+"
+// if present. Returns null (not a guess) when the result isn't plausibly a
+// phone number, so callers never write garbage into customerPhone.
+export function normalizeE164(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const stripped = raw.trim().replace(/[\s\-()]/g, "");
+  // Without a leading "+" there's no reliable country code to assume (e.g. a
+  // "0"-prefixed domestic number), so only explicit international format is
+  // accepted - anything else returns null rather than guessing.
+  if (!stripped.startsWith("+")) return null;
+  const digits = stripped.slice(1);
+  if (!/^\d{7,15}$/.test(digits)) return null;
+  return `+${digits}`;
+}
+
+function resolvePhone(payload: OrderWebhookPayload): string | null {
+  const raw =
+    payload.customer?.phone ?? payload.phone ?? payload.shipping_address?.phone ?? null;
+  return normalizeE164(raw);
+}
+
 export async function captureOrder(
   shop: string,
   payload: OrderWebhookPayload,
   client: PrismaClientLike = prisma,
 ) {
   const shopifyOrderId = payload.admin_graphql_api_id;
+  const customerPhone = resolvePhone(payload);
 
   const order = await client.orderCapture.upsert({
     where: { shop_shopifyOrderId: { shop, shopifyOrderId } },
     update: {
       orderName: payload.name ?? null,
       customerEmail: payload.email ?? payload.customer?.email ?? null,
+      customerPhone,
       customerId: payload.customer?.admin_graphql_api_id ?? null,
       financialStatus: payload.financial_status ?? "unknown",
       paidAt: new Date(),
@@ -44,6 +74,7 @@ export async function captureOrder(
       shopifyOrderId,
       orderName: payload.name ?? null,
       customerEmail: payload.email ?? payload.customer?.email ?? null,
+      customerPhone,
       customerId: payload.customer?.admin_graphql_api_id ?? null,
       financialStatus: payload.financial_status ?? "unknown",
       paidAt: new Date(),
