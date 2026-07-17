@@ -32,10 +32,12 @@ export default function App() {
       <s-app-nav>
         <s-link href="/app">Home</s-link>
         <s-link href="/app/reviews">Reviews</s-link>
+        <s-link href="/app/reviews/import">Import reviews</s-link>
         <s-link href="/app/products">Products</s-link>
         <s-link href="/app/attributes">Attributes</s-link>
         <s-link href="/app/marketplace">Marketplaces</s-link>
         <s-link href="/app/settings">Settings</s-link>
+        <s-link href="/app/channels">Channels</s-link>
         <s-link href="/app/billing">Billing</s-link>
         <s-link href="/app/additional">Additional page</s-link>
       </s-app-nav>

@@ -1,0 +1,6 @@
+product_handle,customer_name,customer_email,rating,title,body,created_at,external_ref
+vitamin-c-serum,Sarah Chen,sarah@example.com,5,Best serum ever,"My skin has never looked brighter. Worth every penny!",2025-11-15,ord_12345
+wireless-buds,James Wilson,james@example.com,4,Great sound but short battery,"Battery lasts about 4 hours, not the ""6 hours"" advertised. Sound quality is excellent though.",2025-12-02,
+retinol-moisturizer,Priya Patel,,3,Too heavy for summer,It leaves a greasy feeling that takes forever to absorb. Better for winter use.,2026-01-10,ord_67890
+led-face-mask,Mike Chen,mike@example.com,5,Noticeable results in 3 weeks,My fine lines are visibly reduced. I use it 15 minutes daily.,2026-02-18,ord_24680
+hair-growth-serum,Emma Lopez,emma@example.com,4,Slow but working,"I see baby hairs after 2 months of daily use. Patience is key, but it does work.",2026-03-05,

@@ -163,6 +163,8 @@ export type CreateReviewInput = {
   media?: CreateReviewMediaInput[];
   verifiedBuyer?: boolean;
   verifiedOrderId?: string | null;
+  importBatchId?: string;
+  externalRef?: string;
 };
 
 export async function createReview(shop: string, data: CreateReviewInput) {
@@ -209,6 +211,8 @@ export async function createReview(shop: string, data: CreateReviewInput) {
         verifiedBuyer: data.verifiedBuyer ?? false,
         verifiedOrderId: data.verifiedOrderId ?? null,
         ...(data.createdAt ? { createdAt: data.createdAt } : {}),
+        ...(data.importBatchId ? { importBatchId: data.importBatchId } : {}),
+        ...(data.externalRef ? { externalRef: data.externalRef } : {}),
       },
     });
 
@@ -256,6 +260,7 @@ export async function voteHelpful(shop: string, reviewId: string) {
 export type ListReviewsForAdminArgs = {
   status?: string;
   productId?: string;
+  importBatchId?: string;
   page?: number;
   pageSize?: number;
 };
@@ -265,11 +270,14 @@ export type ListReviewsForAdminArgs = {
 // media joined so the moderation table can render context.
 export async function listReviewsForAdmin(
   shop: string,
-  { status, productId, page = 1, pageSize = 25 }: ListReviewsForAdminArgs = {}
+  { status, productId, importBatchId, page = 1, pageSize = 25 }: ListReviewsForAdminArgs = {}
 ) {
-  const where: { shop: string; status?: string; productId?: string } = { shop };
+  const where: { shop: string; status?: string; productId?: string; importBatchId?: string } = {
+    shop,
+  };
   if (status) where.status = status;
   if (productId) where.productId = productId;
+  if (importBatchId) where.importBatchId = importBatchId;
 
   const [total, reviews] = await Promise.all([
     prisma.review.count({ where }),
