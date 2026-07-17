@@ -7,7 +7,8 @@
   data-product-handle="{{ product.handle }}"
   data-api-base="{{ block.settings.api_base }}"
   data-page-size="{{ block.settings.page_size }}"
-  style="--reviewos-accent: {{ block.settings.accent_color }};"
+  data-layout="{{ block.settings.layout }}"
+  style="--reviewos-accent: {{ block.settings.accent_color }}; --rvos-feed-columns: {{ block.settings.columns }};"
 >
   {% if block.settings.heading != blank %}
     <h3 class="reviewos-block-heading">{{ block.settings.heading }}</h3>
@@ -22,6 +23,18 @@
     { "type": "text", "id": "heading", "label": "Heading", "default": "Customer reviews" },
     { "type": "color", "id": "accent_color", "label": "Accent color", "default": "#1a1a1a" },
     { "type": "range", "id": "page_size", "label": "Reviews per page", "min": 3, "max": 20, "step": 1, "default": 5 },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "Layout",
+      "default": "list",
+      "options": [
+        { "value": "list", "label": "List" },
+        { "value": "grid", "label": "Grid" },
+        { "value": "carousel", "label": "Carousel" }
+      ]
+    },
+    { "type": "range", "id": "columns", "label": "Grid columns", "min": 2, "max": 4, "step": 1, "default": 2, "info": "Only applies to Grid layout" },
     { "type": "text", "id": "api_base", "label": "API base path", "default": "/apps/reviewos" }
   ]
 }

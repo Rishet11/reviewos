@@ -515,6 +515,49 @@
   gap: 16px;
 }
 
+[data-layout="grid"] .rvos-feed__list {
+  display: grid;
+  grid-template-columns: repeat(var(--rvos-feed-columns, 2), 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  [data-layout="grid"] .rvos-feed__list {
+    grid-template-columns: 1fr;
+  }
+}
+
+[data-layout="carousel"] .rvos-feed__list {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 16px;
+  padding-bottom: 8px;
+  scrollbar-color: var(--rvos-accent) var(--rvos-bg-subtle);
+  scrollbar-width: thin;
+}
+
+[data-layout="carousel"] .rvos-feed__list::-webkit-scrollbar {
+  height: 8px;
+}
+
+[data-layout="carousel"] .rvos-feed__list::-webkit-scrollbar-track {
+  background: var(--rvos-bg-subtle);
+  border-radius: var(--rvos-radius-sm);
+}
+
+[data-layout="carousel"] .rvos-feed__list::-webkit-scrollbar-thumb {
+  background: var(--rvos-accent);
+  border-radius: var(--rvos-radius-sm);
+}
+
+[data-layout="carousel"] .rvos-feed__list .rvos-card {
+  flex: 0 0 280px;
+  scroll-snap-align: start;
+}
+
 .rvos-card {
   border: 1px solid var(--rvos-border);
   border-radius: var(--rvos-radius);
