@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import type {
   ActionFunctionArgs,
   HeadersFunction,
@@ -18,17 +18,27 @@ import {
 import { REVIEW_STATUSES, type ReviewStatus } from "../services/review-status";
 import { getOrGenerateSummary } from "../services/ai/summaries.server";
 import { syncRatingMetafields } from "../services/metafields.server";
+import { bulkModerateBatch } from "../services/review-import.server";
+import { getPlan } from "../services/entitlements.server";
+import {
+  previewBackfill,
+  runBackfill,
+  FREE_MONTHLY_CAP,
+  countBlastRowsThisMonth,
+} from "../services/review-request-backfill.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
 
   const url = new URL(request.url);
   const status = url.searchParams.get("status") ?? "";
   const productId = url.searchParams.get("productId") ?? "";
+  const batchId = url.searchParams.get("batch") ?? "";
 
   const { reviews, total } = await listReviewsForAdmin(session.shop, {
     status: status || undefined,
     productId: productId || undefined,
+    importBatchId: batchId || undefined,
   });
 
   const products = await prisma.product.findMany({
@@ -37,7 +47,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     orderBy: { name: "asc" },
   });
 
-  return { reviews, total, products, status, productId };
+  const plan = await getPlan(billing);
+  const blastCapRemaining =
+    plan === "free"
+      ? Math.max(0, FREE_MONTHLY_CAP - (await countBlastRowsThisMonth(session.shop)))
+      : null;
+
+  return { reviews, total, products, status, productId, batchId, plan, blastCapRemaining };
 };
 
 async function trySyncRatingMetafields(
@@ -53,7 +69,7 @@ async function trySyncRatingMetafields(
 }
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, admin } = await authenticate.admin(request);
+  const { session, admin, billing } = await authenticate.admin(request);
 
   const form = await request.formData();
   const intent = String(form.get("intent"));
@@ -69,6 +85,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (!updated) return { error: "Review not found" };
       await trySyncRatingMetafields(session.shop, updated.productId, admin);
       return { ok: true };
+    }
+    case "bulk-moderate": {
+      const importBatchId = String(form.get("importBatchId") ?? "");
+      const status = String(form.get("status"));
+      if (!importBatchId) return { error: "Missing importBatchId" };
+      if (!REVIEW_STATUSES.includes(status as ReviewStatus)) {
+        return { error: `Invalid status: ${status}` };
+      }
+      const result = await bulkModerateBatch(
+        session.shop,
+        importBatchId,
+        status as ReviewStatus,
+        admin
+      );
+      return { ok: true, count: result.count };
     }
     case "reply": {
       const reviewId = String(form.get("reviewId"));
@@ -104,6 +135,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         status: "approved",
       });
       return { ok: true };
+    }
+    case "blast-preview": {
+      const sinceDays = Number(form.get("sinceDays") ?? 30);
+      if (!Number.isFinite(sinceDays) || sinceDays < 1 || sinceDays > 60) {
+        return { error: "Days must be between 1 and 60" };
+      }
+      const plan = await getPlan(billing);
+      const result = await previewBackfill(session.shop, admin, sinceDays, plan);
+      return { ok: true, preview: result };
+    }
+    case "blast-run": {
+      const sinceDays = Number(form.get("sinceDays") ?? 30);
+      if (!Number.isFinite(sinceDays) || sinceDays < 1 || sinceDays > 60) {
+        return { error: "Days must be between 1 and 60" };
+      }
+      const plan = await getPlan(billing);
+      const result = await runBackfill(session.shop, admin, sinceDays, plan);
+      return { ok: true, run: result };
     }
     default:
       return { error: `Unknown intent: ${intent}` };
@@ -257,13 +306,60 @@ function ReviewRowCard({
 }
 
 export default function Reviews() {
-  const { reviews, total, products, status, productId } =
+  const { reviews, total, products, status, productId, batchId, plan, blastCapRemaining } =
     useLoaderData<typeof loader>();
   const [, setSearchParams] = useSearchParams();
   const moderateFetcher = useFetcher<typeof action>();
   const createFetcher = useFetcher<typeof action>();
   const summaryFetcher = useFetcher<typeof action>();
+  const bulkModerateFetcher = useFetcher<typeof action>();
+  const blastPreviewFetcher = useFetcher<typeof action>();
+  const blastRunFetcher = useFetcher<typeof action>();
+  const [blastSinceDays, setBlastSinceDays] = useState(30);
   const shopify = useAppBridge();
+
+  const blastPreview =
+    blastPreviewFetcher.data && "preview" in blastPreviewFetcher.data
+      ? blastPreviewFetcher.data.preview
+      : null;
+
+  useEffect(() => {
+    if (blastRunFetcher.data && "run" in blastRunFetcher.data && blastRunFetcher.data.run) {
+      shopify.toast.show(`Requested reviews for ${blastRunFetcher.data.run.created} past buyers`);
+    }
+  }, [blastRunFetcher.data, shopify]);
+
+  const handleBlastPreview = () => {
+    const form = new FormData();
+    form.set("intent", "blast-preview");
+    form.set("sinceDays", String(blastSinceDays));
+    blastPreviewFetcher.submit(form, { method: "post" });
+  };
+
+  const handleBlastRun = () => {
+    const form = new FormData();
+    form.set("intent", "blast-run");
+    form.set("sinceDays", String(blastSinceDays));
+    blastRunFetcher.submit(form, { method: "post" });
+  };
+
+  useEffect(() => {
+    if (
+      bulkModerateFetcher.data &&
+      "ok" in bulkModerateFetcher.data &&
+      bulkModerateFetcher.data.ok
+    ) {
+      shopify.toast.show(`Batch updated (${bulkModerateFetcher.data.count} reviews)`);
+    }
+  }, [bulkModerateFetcher.data, shopify]);
+
+  const handleBulkModerate = (newStatus: ReviewStatus) => {
+    const form = new FormData();
+    form.set("intent", "bulk-moderate");
+    form.set("importBatchId", batchId);
+    form.set("status", newStatus);
+    bulkModerateFetcher.submit(form, { method: "post" });
+  };
 
   useEffect(() => {
     if (
@@ -342,6 +438,31 @@ export default function Reviews() {
           </s-select>
         </s-stack>
 
+        {batchId && (
+          <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+            <s-stack direction="inline" gap="base" alignItems="center">
+              <s-text>
+                Filtered to import batch <s-text type="strong">{batchId}</s-text>
+              </s-text>
+              <s-button
+                variant="secondary"
+                disabled={bulkModerateFetcher.state !== "idle"}
+                onClick={() => handleBulkModerate("approved")}
+              >
+                Approve batch
+              </s-button>
+              <s-button
+                variant="secondary"
+                tone="critical"
+                disabled={bulkModerateFetcher.state !== "idle"}
+                onClick={() => handleBulkModerate("rejected")}
+              >
+                Reject batch
+              </s-button>
+            </s-stack>
+          </s-box>
+        )}
+
         <s-stack direction="block" gap="base">
           {reviews.length === 0 && (
             <s-paragraph color="subdued">No reviews match this filter.</s-paragraph>
@@ -416,6 +537,60 @@ export default function Reviews() {
             </s-button>
           </s-stack>
         </createFetcher.Form>
+      </s-section>
+
+      <s-section slot="aside" heading="Request reviews from past buyers">
+        <s-stack direction="block" gap="base">
+          <s-number-field
+            label="Look back (days)"
+            name="sinceDays"
+            value={String(blastSinceDays)}
+            min={1}
+            max={60}
+            onChange={(e: Event) => {
+              const value = Number((e.target as HTMLInputElement).value);
+              if (Number.isFinite(value)) setBlastSinceDays(value);
+            }}
+          ></s-number-field>
+          <s-text color="subdued">
+            Shopify only returns orders from the last 60 days for this scope.
+          </s-text>
+          {plan === "free" && (
+            <s-text color="subdued">
+              Free plan: {blastCapRemaining} of {FREE_MONTHLY_CAP} blast sends left this month.
+            </s-text>
+          )}
+
+          <s-button
+            variant="secondary"
+            {...(blastPreviewFetcher.state !== "idle" ? { loading: true } : {})}
+            onClick={handleBlastPreview}
+          >
+            Preview
+          </s-button>
+
+          {blastPreview && (
+            <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+              <s-stack direction="block" gap="small">
+                <s-text type="strong">{blastPreview.eligible} eligible</s-text>
+                <s-text color="subdued">
+                  Excluded: {blastPreview.excluded.suppressed} suppressed,{" "}
+                  {blastPreview.excluded.alreadyReviewed} already reviewed,{" "}
+                  {blastPreview.excluded.maxTouches} already contacted,{" "}
+                  {blastPreview.excluded.overCap} over monthly cap
+                </s-text>
+                <s-button
+                  variant="primary"
+                  disabled={blastPreview.eligible === 0}
+                  {...(blastRunFetcher.state !== "idle" ? { loading: true } : {})}
+                  onClick={handleBlastRun}
+                >
+                  Confirm and send
+                </s-button>
+              </s-stack>
+            </s-box>
+          )}
+        </s-stack>
       </s-section>
     </s-page>
   );
