@@ -26,7 +26,10 @@ export async function sendEmail(args: {
     subject: args.subject,
     html: args.html,
     text: args.text,
-    headers: { "List-Unsubscribe": `<${args.unsubscribeUrl}>` },
+    headers: {
+      "List-Unsubscribe": `<${args.unsubscribeUrl}>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    },
   });
   if (result.error) throw new Error(result.error.message ?? "resend_send_failed");
   return result.data;
