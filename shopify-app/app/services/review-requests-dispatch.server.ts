@@ -11,10 +11,12 @@ import { signVerificationToken } from "./order-verification.server";
 import { signUnsubscribe } from "../lib/unsubscribe-token.server";
 import { buildReviewRequestEmail } from "./email/templates/review-request";
 import { sendEmail } from "./email/resend.server";
+import { sendWhatsApp } from "./channels/whatsapp.server";
 
 type PrismaClientLike = typeof prisma;
 
-const MAX_SENT_COUNT = 3;
+// Exported: reused by review-request-backfill.server.ts's max-touches exclusion check.
+export const MAX_SENT_COUNT = 3;
 const MAX_FAILED_ATTEMPTS = 5;
 const RESEND_INTERVAL_MS = 7 * 86_400_000;
 
@@ -76,6 +78,27 @@ export async function dispatchReviewRequest(
     rr.shop,
   )}&email=${encodeURIComponent(rr.customerEmail)}&sig=${unsubSig}`;
 
+  if (rr.channel === "whatsapp") {
+    if (!rr.customerPhone) {
+      return failAttempt(rr, client, "missing_customer_phone", now);
+    }
+    const result = await sendWhatsApp(
+      {
+        shop: rr.shop,
+        to: rr.customerPhone,
+        customerName: rr.customerName ?? "",
+        productName: rr.product.name,
+        reviewUrl: deepLinkUrl,
+        unsubscribeUrl,
+      },
+      client,
+    );
+    if (!result.ok) {
+      return failAttempt(rr, client, result.error ?? "whatsapp_send_failed", now);
+    }
+    return finalizeSent(rr, client, now);
+  }
+
   const { subject, html, text } = buildReviewRequestEmail({
     shopName: rr.shop,
     customerName: rr.customerName,
@@ -92,6 +115,10 @@ export async function dispatchReviewRequest(
     return failAttempt(rr, client, message, now);
   }
 
+  return finalizeSent(rr, client, now);
+}
+
+async function finalizeSent(rr: DueReviewRequest, client: PrismaClientLike, now: Date) {
   const sentCount = rr.sentCount + 1;
   const exhausted = sentCount >= MAX_SENT_COUNT;
   await client.reviewRequest.update({
@@ -129,11 +156,47 @@ async function failAttempt(
     : { id: rr.id, result: "retry_pending" as const };
 }
 
+const SENDING_CLAIM_TIMEOUT_MS = 15 * 60_000;
+
+// Atomically claims a due row for this dispatch run by flipping it from
+// "pending" to "sending". Only one concurrent cron invocation can win the
+// claim for a given row (the WHERE clause only matches while status is still
+// "pending"), so overlapping runs can't double-send.
+export async function claimReviewRequest(
+  id: string,
+  client: PrismaClientLike = prisma,
+): Promise<number> {
+  const { count } = await client.reviewRequest.updateMany({
+    where: { id, status: "pending" },
+    data: { status: "sending" },
+  });
+  return count;
+}
+
+// Crash recovery: a row left in "sending" past the timeout means the process
+// that claimed it died mid-dispatch. Put it back in "pending" so the next
+// tick can retry it.
+export async function reclaimStaleSendingRequests(
+  now: Date,
+  client: PrismaClientLike = prisma,
+) {
+  return client.reviewRequest.updateMany({
+    where: {
+      status: "sending",
+      updatedAt: { lt: new Date(now.getTime() - SENDING_CLAIM_TIMEOUT_MS) },
+    },
+    data: { status: "pending" },
+  });
+}
+
 export async function dispatchDueReviewRequests(client: PrismaClientLike = prisma) {
   const now = new Date();
+  await reclaimStaleSendingRequests(now, client);
   const due = await findDueReviewRequests(now, 100, client);
   const results = [];
   for (const rr of due) {
+    const claimed = await claimReviewRequest(rr.id, client);
+    if (claimed !== 1) continue;
     results.push(await dispatchReviewRequest(rr, client, now));
   }
   return { processed: results.length, results };

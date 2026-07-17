@@ -4,6 +4,7 @@ const mockPrisma = {
   reviewRequest: {
     findMany: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   },
   emailSuppression: {
     findUnique: vi.fn(),
@@ -29,11 +30,15 @@ vi.mock("./email/templates/review-request", () => ({
 }));
 const sendEmailMock = vi.fn();
 vi.mock("./email/resend.server", () => ({ sendEmail: sendEmailMock }));
+const sendWhatsAppMock = vi.fn();
+vi.mock("./channels/whatsapp.server", () => ({ sendWhatsApp: sendWhatsAppMock }));
 
 const {
   findDueReviewRequests,
   dispatchReviewRequest,
   dispatchDueReviewRequests,
+  claimReviewRequest,
+  reclaimStaleSendingRequests,
 } = await import("./review-requests-dispatch.server");
 
 const BASE_RR = {
@@ -59,7 +64,9 @@ beforeEach(() => {
   mockPrisma.emailSuppression.findUnique.mockResolvedValue(null);
   mockPrisma.review.findFirst.mockResolvedValue(null);
   mockPrisma.reviewRequest.update.mockResolvedValue({});
+  mockPrisma.reviewRequest.updateMany.mockResolvedValue({ count: 1 });
   sendEmailMock.mockResolvedValue({ id: "email_1" });
+  sendWhatsAppMock.mockResolvedValue({ ok: true });
 });
 
 describe("findDueReviewRequests", () => {
@@ -182,5 +189,105 @@ describe("dispatchDueReviewRequests", () => {
     expect(result.processed).toBe(2);
     expect(result.results).toHaveLength(2);
     expect(sendEmailMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("claimReviewRequest", () => {
+  it("claims a pending row, and a second concurrent claim on the same row returns 0", async () => {
+    const store = { id: "rr_1", status: "pending" };
+    const fakeClient = {
+      reviewRequest: {
+        updateMany: vi.fn(async ({ where, data }: any) => {
+          if (store.id === where.id && store.status === where.status) {
+            store.status = data.status;
+            return { count: 1 };
+          }
+          return { count: 0 };
+        }),
+      },
+    };
+
+    const first = await claimReviewRequest("rr_1", fakeClient as any);
+    const second = await claimReviewRequest("rr_1", fakeClient as any);
+
+    expect(first).toBe(1);
+    expect(second).toBe(0);
+  });
+});
+
+describe("reclaimStaleSendingRequests", () => {
+  it("resets rows stuck in 'sending' past the 15-minute timeout back to 'pending'", async () => {
+    mockPrisma.reviewRequest.updateMany.mockResolvedValue({ count: 1 });
+    const now = new Date("2026-07-20T00:00:00Z");
+
+    await reclaimStaleSendingRequests(now, mockPrisma as any);
+
+    expect(mockPrisma.reviewRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        status: "sending",
+        updatedAt: { lt: new Date(now.getTime() - 15 * 60_000) },
+      },
+      data: { status: "pending" },
+    });
+  });
+});
+
+describe("dispatchReviewRequest - whatsapp channel (Slice 5)", () => {
+  const WA_RR = { ...BASE_RR, channel: "whatsapp", customerPhone: "+15551234567" };
+
+  it("sends via sendWhatsApp on the happy path and reuses the same sent-status update as email", async () => {
+    const now = new Date("2026-07-20T00:00:00Z");
+
+    const result = await dispatchReviewRequest({ ...WA_RR, sentCount: 0 } as any, mockPrisma as any, now);
+
+    expect(sendWhatsAppMock).toHaveBeenCalledWith(
+      expect.objectContaining({ shop: "shop1.myshopify.com", to: "+15551234567" }),
+      mockPrisma,
+    );
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ id: "rr_1", result: "sent" });
+    expect(mockPrisma.reviewRequest.update).toHaveBeenCalledWith({
+      where: { id: "rr_1" },
+      data: {
+        sentCount: 1,
+        lastSentAt: now,
+        status: "pending",
+        scheduledSendAt: new Date(now.getTime() + 7 * 86_400_000),
+      },
+    });
+  });
+
+  it("fails the attempt with a clear reason when there's no customerPhone", async () => {
+    const result = await dispatchReviewRequest(
+      { ...WA_RR, customerPhone: null } as any,
+      mockPrisma as any,
+    );
+
+    expect(sendWhatsAppMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ id: "rr_1", result: "retry_pending" });
+    expect(mockPrisma.reviewRequest.update).toHaveBeenCalledWith({
+      where: { id: "rr_1" },
+      data: { failedAttempts: 1, lastError: "missing_customer_phone" },
+    });
+  });
+
+  it("fails the attempt with a clear reason when sendWhatsApp reports suppressed/no connection", async () => {
+    sendWhatsAppMock.mockResolvedValue({ ok: false, error: "no_enabled_whatsapp_connection" });
+
+    const result = await dispatchReviewRequest(WA_RR as any, mockPrisma as any);
+
+    expect(result).toEqual({ id: "rr_1", result: "retry_pending" });
+    expect(mockPrisma.reviewRequest.update).toHaveBeenCalledWith({
+      where: { id: "rr_1" },
+      data: { failedAttempts: 1, lastError: "no_enabled_whatsapp_connection" },
+    });
+  });
+
+  it("still sends over email, unchanged, when channel is absent/email", async () => {
+    const result = await dispatchReviewRequest({ ...BASE_RR, sentCount: 0 } as any, mockPrisma as any);
+
+    expect(sendEmailMock).toHaveBeenCalled();
+    expect(sendWhatsAppMock).not.toHaveBeenCalled();
+    expect(result.result).toBe("sent");
   });
 });
