@@ -83,8 +83,20 @@ model Review {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  // ---- Slice 1: CSV review import/export ----
+  // importBatchId is a soft reference (no @relation) to ImportBatch.id,
+  // matching the OrderCapture/ReviewRequest soft-reference convention above -
+  // undoImport prunes reviews by this without any FK cascade to worry about.
+  // externalRef is either the source platform's own review id (Judge.me/Loox
+  // "id" column) or, when absent, a content hash - either way it's the
+  // dedupe key for reimporting the same file/export twice.
+  importBatchId       String?
+  externalRef         String?
+
   @@index([shop])
   @@index([shop, productId, status])
+  @@index([shop, importBatchId])
+  @@index([shop, externalRef])
 }
 
 model ReviewMedia {
@@ -157,11 +169,14 @@ model MarketplaceStat {
   product     Product           @relation(fields: [productId], references: [id])
   sourceId    String
   source      MarketplaceSource @relation(fields: [sourceId], references: [id])
-  rating      Float
-  reviewCount Int
-  url         String
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  rating        Float
+  reviewCount   Int
+  url           String
+  lastCheckedAt DateTime?
+  refreshSource String            @default("manual")
+  externalRef   String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@unique([shop, productId, sourceId])
   @@index([shop])
@@ -197,6 +212,7 @@ model OrderCapture {
   shopifyOrderId  String    // GID, e.g. gid://shopify/Order/6012345678901
   orderName       String?
   customerEmail   String?
+  customerPhone   String?   // Slice 5: E.164-normalized, used for the WhatsApp channel only
   customerId      String?
   financialStatus String
   paidAt          DateTime?
@@ -241,9 +257,10 @@ model ReviewRequest {
   shopifyCustomerId String?
   customerEmail     String
   customerName      String?
+  customerPhone     String?   // Slice 5: E.164-normalized, populated when the order webhook carries a phone
 
   cohort            String    @default("first_time") // "first_time" | "repeat"
-  channel           String    @default("email")       // forward-compat slot for v1.1 WhatsApp/SMS, unused
+  channel           String    @default("email")       // "email" | "whatsapp" (Slice 5)
   deliveredAt       DateTime
   scheduledSendAt   DateTime
 
@@ -270,6 +287,63 @@ model EmailSuppression {
   createdAt DateTime @default(now())
 
   @@unique([shop, email])
+  @@index([shop])
+}
+
+// ---- Slice 1: CSV review import/export ----
+// One row per uploaded CSV file. Reviews created by a batch carry
+// Review.importBatchId, so undo/moderation can act on "everything this file
+// created" without needing a join table.
+model ImportBatch {
+  id            String   @id @default(cuid())
+  shop          String
+  filename      String
+  preset        String
+  sourceLabel   String
+  status        String   @default("processing") // processing | completed | failed | undone
+  totalRows     Int      @default(0)
+  importedCount Int      @default(0)
+  skippedCount  Int      @default(0)
+  errorReport   String   @default("[]") // JSON array of {row, error}
+  attestedAt    DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([shop])
+}
+
+// ---- Slice 5: WhatsApp review-request channel (merchant-authenticated, BYO Meta Cloud API) ----
+// One connection per shop. Secrets (appSecret, accessToken) are stored only in
+// their *Enc encrypted form (see app/services/crypto.server.ts) - never plaintext.
+model WhatsAppConnection {
+  id               String   @id @default(cuid())
+  shop             String   @unique
+  phoneNumberId    String
+  wabaId           String
+  appId            String
+  appSecretEnc     String
+  accessTokenEnc   String
+  templateName     String
+  templateLanguage String   @default("en")
+  templateVarOrder String   // JSON array mapping template body params to canonical vars, e.g. ["customerName","productName","reviewUrl"]
+  enabled          Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([wabaId])
+}
+
+// Channel-scoped suppression list (mirrors EmailSuppression but keyed by
+// channel+identifier since WhatsApp opt-outs are by phone number, not email).
+model ChannelSuppression {
+  id         String   @id @default(cuid())
+  shop       String
+  channel    String
+  identifier String
+  reason     String
+  createdAt  DateTime @default(now())
+
+  @@unique([shop, channel, identifier])
   @@index([shop])
 }
 
