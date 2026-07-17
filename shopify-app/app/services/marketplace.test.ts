@@ -123,7 +123,13 @@ describe("upsertStat", () => {
           sourceId: "src_1",
         },
       },
-      update: { rating: 4.6, reviewCount: 12431, url: "https://amazon.com/dp/x" },
+      update: {
+        rating: 4.6,
+        reviewCount: 12431,
+        url: "https://amazon.com/dp/x",
+        lastCheckedAt: expect.any(Date),
+        refreshSource: "manual",
+      },
       create: {
         shop: "shop1.myshopify.com",
         productId: "prod_1",
@@ -131,6 +137,8 @@ describe("upsertStat", () => {
         rating: 4.6,
         reviewCount: 12431,
         url: "https://amazon.com/dp/x",
+        lastCheckedAt: expect.any(Date),
+        refreshSource: "manual",
       },
     });
   });

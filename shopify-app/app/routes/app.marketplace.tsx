@@ -17,6 +17,8 @@ import {
   upsertStat,
 } from "../services/marketplace.server";
 
+const STALE_THRESHOLD_DAYS = 7;
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
@@ -28,7 +30,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     orderBy: { createdAt: "desc" },
   });
 
-  return { sources, stats };
+  const cutoff = new Date(Date.now() - STALE_THRESHOLD_DAYS * 86_400_000);
+  const staleCount = stats.filter(
+    (stat) => (stat.lastCheckedAt ?? stat.updatedAt) < cutoff,
+  ).length;
+
+  return { sources, stats, staleCount, staleThresholdDays: STALE_THRESHOLD_DAYS };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -119,7 +126,7 @@ function SourceRow({ source }: { source: Source }) {
   );
 }
 
-function StatRow({ stat }: { stat: Stat }) {
+function StatRow({ stat, staleThresholdDays }: { stat: Stat; staleThresholdDays: number }) {
   const deleteFetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
 
@@ -128,6 +135,10 @@ function StatRow({ stat }: { stat: Stat }) {
       shopify.toast.show("Stat deleted");
     }
   }, [deleteFetcher.data, shopify]);
+
+  const cutoff = Date.now() - staleThresholdDays * 86_400_000;
+  const lastChecked = stat.lastCheckedAt ?? stat.updatedAt;
+  const isStale = new Date(lastChecked).getTime() < cutoff;
 
   return (
     <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
@@ -138,6 +149,7 @@ function StatRow({ stat }: { stat: Stat }) {
           <s-text color="subdued">
             {stat.rating.toFixed(1)} · {stat.reviewCount.toLocaleString()}
           </s-text>
+          {isStale && <s-badge tone="warning">Stale</s-badge>}
         </s-stack>
         <s-stack direction="inline" gap="base">
           <deleteFetcher.Form method="post">
@@ -159,7 +171,7 @@ function StatRow({ stat }: { stat: Stat }) {
 }
 
 export default function Marketplace() {
-  const { sources, stats } = useLoaderData<typeof loader>();
+  const { sources, stats, staleCount, staleThresholdDays } = useLoaderData<typeof loader>();
   const createSourceFetcher = useFetcher<typeof action>();
   const upsertStatFetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
@@ -224,11 +236,17 @@ export default function Marketplace() {
 
       <s-section heading="Product stats">
         <s-stack direction="block" gap="base">
+          {staleCount > 0 && (
+            <s-banner tone="warning">
+              {staleCount} marketplace stat{staleCount === 1 ? "" : "s"} {staleCount === 1 ? "is" : "are"} older
+              than {staleThresholdDays} days.
+            </s-banner>
+          )}
           {stats.length === 0 && (
             <s-paragraph color="subdued">No marketplace stats yet.</s-paragraph>
           )}
           {stats.map((stat) => (
-            <StatRow key={stat.id} stat={stat} />
+            <StatRow key={stat.id} stat={stat} staleThresholdDays={staleThresholdDays} />
           ))}
         </s-stack>
       </s-section>

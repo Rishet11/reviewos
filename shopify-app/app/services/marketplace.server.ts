@@ -46,7 +46,13 @@ export async function upsertStat(
     where: {
       shop_productId_sourceId: { shop, productId: product.id, sourceId: data.sourceId },
     },
-    update: { rating: data.rating, reviewCount: data.reviewCount, url: data.url },
+    update: {
+      rating: data.rating,
+      reviewCount: data.reviewCount,
+      url: data.url,
+      lastCheckedAt: new Date(),
+      refreshSource: "manual",
+    },
     create: {
       shop,
       productId: product.id,
@@ -54,6 +60,8 @@ export async function upsertStat(
       rating: data.rating,
       reviewCount: data.reviewCount,
       url: data.url,
+      lastCheckedAt: new Date(),
+      refreshSource: "manual",
     },
   });
 }
