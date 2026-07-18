@@ -26,9 +26,14 @@
   - Public **/privacy** page live: app/routes/privacy.tsx at https://reviewos-6p4p.onrender.com/privacy, contact rishetmehra11@gmail.com. Source docs/PRIVACY.md updated to match.
   - Commits: 6db5db4, 44067c9, 862ba0a, 23187fa, 06031b4. All test rows cleaned from prod (scratchpad cleanup scripts).
 
-## In progress
-- Code-complete: all hardening + Slices 1-5 built, tested (182 passed / 0 failed), typecheck clean. Awaiting user action items (rotate secrets, verify Resend domain, validate CSV importer, pilot WhatsApp, Pro-gate staleness cron) before next phase. Uncommitted per user instruction.
-- No blockers. Dev store fully functional. Only remaining approval (full App Store PCD review) is a future step, needed only to list publicly — see Next #3.
+## In progress (updated 2026-07-18)
+- Phase 9 work now COMMITTED in 15 logical commits (63894ff..HEAD). Not pushed.
+- Live E2E flow (a) CSV import NOT yet completed. Two real bugs found+fixed during live testing that typecheck/vitest could not catch (Vite client/server boundary errors):
+  - `fix: keep free-plan cap out of client bundle` (487580b) — FREE_MONTHLY_CAP moved to plain `billing-limits.ts`.
+  - `fix: keep import presets out of client bundle` (7992ca2) — PRESETS moved to plain `import-presets.ts`.
+  - **`npm run build` now PASSES (exit 0)** — this build is the gate that catches ALL "Server-only module referenced by client" leaks at once (typecheck+vitest are structurally blind to them). ADD `npm run build` to the pre-test/"done" checklist going forward.
+- **CURRENT TEST BLOCKER: billing gate.** `app/routes/app.tsx:13` runs `billing.require` on every non-/app/billing path; dev store has NO active subscription, so every feature page (Reviews, Import, etc.) redirects to Billing ("hangs then switches to Billing"). To test any feature on the dev store, subscribe/approve the TEST charge on the Billing page first (free on dev stores). This is backlog #8, still open.
+- Flows (b) email blast (held: Resend domain not verified, lands in spam) and (c) WhatsApp (0 WhatsAppConnection rows, no Meta test creds) not runnable yet.
 
 ## Next (backlog)
 1. **Rotate exposed secrets** URGENT: R2 access key + Resend key (pasted in chat 2026-07-17), plus Neon/Groq/RENDER_API_KEY. Update Render env + local .env after rotation.
