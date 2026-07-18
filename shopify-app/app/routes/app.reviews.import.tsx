@@ -14,9 +14,8 @@ import {
   runImport,
   undoImport,
   recoverStuckBatches,
-  PRESETS,
-  type Preset,
 } from "../services/review-import.server";
+import { PRESETS, type Preset } from "../services/import-presets";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);

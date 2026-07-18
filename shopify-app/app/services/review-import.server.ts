@@ -14,6 +14,10 @@ import { createReview } from "./reviews.server";
 import { matchOrderForReview } from "./order-verification.server";
 import { syncRatingMetafields } from "./metafields.server";
 import type { ReviewStatus } from "./review-status";
+import { PRESETS, type Preset } from "./import-presets";
+
+export { PRESETS };
+export type { Preset };
 
 type AdminClient = {
   graphql: (
@@ -80,9 +84,6 @@ export type CanonicalField =
   | "createdAt"
   | "externalRef";
 
-export type Preset = "judgeme" | "loox" | "generic";
-
-export const PRESETS: Preset[] = ["judgeme", "loox", "generic"];
 
 function normalizeHeader(h: string): string {
   return h.toLowerCase().replace(/[\s_]+/g, "");
