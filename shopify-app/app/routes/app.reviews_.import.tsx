@@ -4,7 +4,7 @@ import type {
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { useFetcher, useLoaderData, useRevalidator } from "react-router";
+import { useFetcher, useLoaderData, useNavigate, useRevalidator } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
@@ -90,6 +90,7 @@ export default function ReviewImport() {
   const commitFetcher = useFetcher<typeof action>();
   const undoFetcher = useFetcher<typeof action>();
   const revalidator = useRevalidator();
+  const navigate = useNavigate();
   const shopify = useAppBridge();
 
   const csvTextRef = useRef("");
@@ -117,12 +118,15 @@ export default function ReviewImport() {
       commitFetcher.data.intent === "commit"
     ) {
       shopify.toast.show("Import started");
-      const url = new URL(window.location.href);
-      url.searchParams.set("batch", commitFetcher.data.batchId);
-      window.history.replaceState(null, "", url.toString());
-      revalidator.revalidate();
+      // Navigate to ?batch=<id> via React Router so the loader re-runs with the
+      // batch param and the "Import status" section (with the moderation-queue
+      // link) renders. The old code used history.replaceState + revalidator
+      // .revalidate(): revalidator's identity changes on every revalidation, so
+      // listing it in deps AND calling it here caused an infinite revalidate/
+      // toast loop, and replaceState never updated the loader (batch stayed null).
+      navigate(`?batch=${commitFetcher.data.batchId}`, { replace: true });
     }
-  }, [commitFetcher.data, shopify, revalidator]);
+  }, [commitFetcher.data, shopify, navigate]);
 
   useEffect(() => {
     if (undoFetcher.data && "ok" in undoFetcher.data && undoFetcher.data.ok) {
