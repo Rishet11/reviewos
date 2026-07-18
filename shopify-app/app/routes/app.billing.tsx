@@ -10,12 +10,19 @@ import { authenticate, BILLING_PLANS, BILLING_TEST } from "../shopify.server";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { billing } = await authenticate.admin(request);
 
-  const subscribed = await billing.check({
-    plans: [...BILLING_PLANS],
-    isTest: BILLING_TEST,
-  });
-
-  return { subscribed };
+  try {
+    const { hasActivePayment } = await billing.check({
+      plans: [...BILLING_PLANS],
+      isTest: BILLING_TEST,
+    });
+    return { subscribed: hasActivePayment, billingAvailable: true };
+  } catch (err) {
+    // The Billing API can hard-error (e.g. the app isn't public-distributed
+    // yet). Don't let that blank the Billing page via the app-wide ErrorBoundary
+    // — degrade to "not subscribed" and flag it so the UI explains why.
+    console.error("billing.check failed on Billing page", err);
+    return { subscribed: false, billingAvailable: false };
+  }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -29,7 +36,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Billing() {
-  const { subscribed } = useLoaderData<typeof loader>();
+  const { subscribed, billingAvailable } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const submitting = navigation.state !== "idle";
 
@@ -39,6 +46,12 @@ export default function Billing() {
         <s-stack direction="block" gap="base">
           <s-text type="strong">$9.99 / month</s-text>
           <s-paragraph color="subdued">14-day free trial, cancel anytime.</s-paragraph>
+          {!billingAvailable && (
+            <s-banner tone="warning">
+              Billing is temporarily unavailable. If this persists, the app may
+              need public distribution enabled before it can process charges.
+            </s-banner>
+          )}
           <s-stack direction="block" gap="base">
             <s-text>- AI-generated review summaries</s-text>
             <s-text>- Merchant-defined review attributes</s-text>

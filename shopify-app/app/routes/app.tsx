@@ -9,15 +9,30 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { billing, redirect } = await authenticate.admin(request);
 
   const url = new URL(request.url);
-  if (url.pathname !== "/app/billing") {
-    await billing.require({
-      plans: [...BILLING_PLANS],
-      isTest: BILLING_TEST,
-      // Use the App Bridge-aware redirect from authenticate.admin so the embedded
-      // host/id_token params survive; a plain react-router redirect drops them and
-      // the iframe bounce renders a bare status code instead of the billing page.
-      onFailure: async () => redirect("/app/billing"),
-    });
+  // BILLING_BYPASS is a dev-only escape hatch (set in the local shell, NEVER on
+  // Render) to reach feature pages before the app has public distribution, which
+  // the Shopify Billing API strictly requires. Production never sets it.
+  const bypass = process.env.BILLING_BYPASS === "1";
+  if (url.pathname !== "/app/billing" && !bypass) {
+    try {
+      await billing.require({
+        plans: [...BILLING_PLANS],
+        isTest: BILLING_TEST,
+        // Use the App Bridge-aware redirect from authenticate.admin so the embedded
+        // host/id_token params survive; a plain react-router redirect drops them and
+        // the iframe bounce renders a bare status code instead of the billing page.
+        onFailure: async () => redirect("/app/billing"),
+      });
+    } catch (err) {
+      // A clean "no active subscription" throws the redirect Response from
+      // onFailure — re-throw it untouched. A BillingError (Billing API down, or
+      // the app isn't public-distributed yet) would otherwise hit the app-wide
+      // ErrorBoundary and blank the whole app ("couldn't load"). Fail closed to
+      // the Billing page instead so the merchant sees a real page.
+      if (err instanceof Response) throw err;
+      console.error("billing.require failed; redirecting to Billing", err);
+      throw redirect("/app/billing?billing_error=1");
+    }
   }
 
   // eslint-disable-next-line no-undef
