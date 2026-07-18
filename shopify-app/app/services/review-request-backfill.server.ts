@@ -26,7 +26,9 @@ type AdminClient = {
 export const BACKFILL_COHORT = "backfill";
 export const MAX_SINCE_DAYS = 60;
 export const MAX_ORDERS_SCANNED = 1000;
-export const FREE_MONTHLY_CAP = 200;
+import { FREE_MONTHLY_CAP } from "./billing-limits";
+// Re-exported for existing importers; canonical definition lives in billing-limits.
+export { FREE_MONTHLY_CAP };
 const STAGGER_BUCKET_SIZE = 50;
 const STAGGER_BUCKET_MS = 15 * 60_000;
 const ORDERS_PAGE_SIZE = 50;

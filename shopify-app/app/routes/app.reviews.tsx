@@ -23,9 +23,9 @@ import { getPlan } from "../services/entitlements.server";
 import {
   previewBackfill,
   runBackfill,
-  FREE_MONTHLY_CAP,
   countBlastRowsThisMonth,
 } from "../services/review-request-backfill.server";
+import { FREE_MONTHLY_CAP } from "../services/billing-limits";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
