@@ -283,6 +283,10 @@ export async function previewImport(
   shop: string,
   { csvText, preset }: { csvText: string; preset: Preset }
 ) {
+  if (!PRESETS.includes(preset)) {
+    throw new Error(`Unknown import format: ${preset}`);
+  }
+
   const { headers, rows } = parseReviewCsv(csvText);
   const mapping = detectMapping(headers, preset);
   const cache: ProductCache = new Map();

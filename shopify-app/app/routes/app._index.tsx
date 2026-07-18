@@ -62,8 +62,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   );
   const responseJson = await response.json();
 
-  const product = responseJson.data!.productCreate!.product!;
-  const variantId = product.variants.edges[0]!.node!.id!;
+  const product = responseJson.data?.productCreate?.product;
+  const variantId = product?.variants?.edges?.[0]?.node?.id;
+  if (!product || !variantId) {
+    return { error: "Could not create product" };
+  }
 
   const variantResponse = await admin.graphql(
     `#graphql
@@ -120,7 +123,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const metaobjectResponseJson = await metaobjectResponse.json();
 
   return {
-    product: responseJson!.data!.productCreate!.product,
+    product,
     variant:
       variantResponseJson!.data!.productVariantsBulkUpdate!.productVariants,
     metaobject: metaobjectResponseJson!.data!.metaobjectUpsert!.metaobject,
@@ -138,8 +141,10 @@ export default function Index() {
   useEffect(() => {
     if (fetcher.data?.product?.id) {
       shopify.toast.show("Product created");
+    } else if (fetcher.data && "error" in fetcher.data && fetcher.data.error) {
+      shopify.toast.show(fetcher.data.error, { isError: true });
     }
-  }, [fetcher.data?.product?.id, shopify]);
+  }, [fetcher.data?.product?.id, fetcher.data, shopify]);
 
   const generateProduct = () => fetcher.submit({}, { method: "POST" });
 

@@ -74,7 +74,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
-  switch (intent) {
+  try {
+    switch (intent) {
     case "moderate": {
       const reviewId = String(form.get("reviewId"));
       const status = String(form.get("status"));
@@ -156,6 +157,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     default:
       return { error: `Unknown intent: ${intent}` };
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Something went wrong" };
   }
 };
 
@@ -188,6 +192,8 @@ function ReviewRowCard({
   useEffect(() => {
     if (replyFetcher.data && "ok" in replyFetcher.data && replyFetcher.data.ok) {
       shopify.toast.show("Reply saved");
+    } else if (replyFetcher.data && "error" in replyFetcher.data && replyFetcher.data.error) {
+      shopify.toast.show(replyFetcher.data.error, { isError: true });
     }
   }, [replyFetcher.data, shopify]);
 
@@ -326,8 +332,16 @@ export default function Reviews() {
   useEffect(() => {
     if (blastRunFetcher.data && "run" in blastRunFetcher.data && blastRunFetcher.data.run) {
       shopify.toast.show(`Requested reviews for ${blastRunFetcher.data.run.created} past buyers`);
+    } else if (blastRunFetcher.data && "error" in blastRunFetcher.data && blastRunFetcher.data.error) {
+      shopify.toast.show(blastRunFetcher.data.error, { isError: true });
     }
   }, [blastRunFetcher.data, shopify]);
+
+  useEffect(() => {
+    if (blastPreviewFetcher.data && "error" in blastPreviewFetcher.data && blastPreviewFetcher.data.error) {
+      shopify.toast.show(blastPreviewFetcher.data.error, { isError: true });
+    }
+  }, [blastPreviewFetcher.data, shopify]);
 
   const handleBlastPreview = () => {
     const form = new FormData();
@@ -350,6 +364,12 @@ export default function Reviews() {
       bulkModerateFetcher.data.ok
     ) {
       shopify.toast.show(`Batch updated (${bulkModerateFetcher.data.count} reviews)`);
+    } else if (
+      bulkModerateFetcher.data &&
+      "error" in bulkModerateFetcher.data &&
+      bulkModerateFetcher.data.error
+    ) {
+      shopify.toast.show(bulkModerateFetcher.data.error, { isError: true });
     }
   }, [bulkModerateFetcher.data, shopify]);
 
@@ -368,6 +388,8 @@ export default function Reviews() {
       summaryFetcher.data.ok
     ) {
       shopify.toast.show("AI summary regenerated");
+    } else if (summaryFetcher.data && "error" in summaryFetcher.data && summaryFetcher.data.error) {
+      shopify.toast.show(summaryFetcher.data.error, { isError: true });
     }
   }, [summaryFetcher.data, shopify]);
 
@@ -378,8 +400,16 @@ export default function Reviews() {
       createFetcher.data.ok
     ) {
       shopify.toast.show("Review created");
+    } else if (createFetcher.data && "error" in createFetcher.data && createFetcher.data.error) {
+      shopify.toast.show(createFetcher.data.error, { isError: true });
     }
   }, [createFetcher.data, shopify]);
+
+  useEffect(() => {
+    if (moderateFetcher.data && "error" in moderateFetcher.data && moderateFetcher.data.error) {
+      shopify.toast.show(moderateFetcher.data.error, { isError: true });
+    }
+  }, [moderateFetcher.data, shopify]);
 
   const handleModerate = (reviewId: string, newStatus: ReviewStatus) => {
     const form = new FormData();

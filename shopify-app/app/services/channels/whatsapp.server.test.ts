@@ -109,4 +109,16 @@ describe("sendWhatsApp", () => {
 
     expect(result).toEqual({ ok: false, error: "invalid template" });
   });
+
+  it("returns the error-result shape instead of throwing when decrypting the access token fails", async () => {
+    const { decryptSecret } = await import("../crypto.server");
+    (decryptSecret as any).mockImplementationOnce(() => {
+      throw new Error("bad secret blob");
+    });
+
+    const result = await sendWhatsApp(BASE_ARGS, mockPrisma as any);
+
+    expect(result).toEqual({ ok: false, error: "bad secret blob" });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
 });

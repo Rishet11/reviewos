@@ -64,10 +64,9 @@ export async function sendWhatsApp(
     text: vars[key as keyof CanonicalVars] ?? "",
   }));
 
-  const accessToken = decryptSecret(connection.accessTokenEnc);
-
   let response: Response;
   try {
+    const accessToken = decryptSecret(connection.accessTokenEnc);
     response = await fetch(
       `https://graph.facebook.com/${GRAPH_VERSION}/${connection.phoneNumberId}/messages`,
       {

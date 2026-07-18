@@ -32,6 +32,7 @@ const {
   parseReviewCsv,
   detectMapping,
   mapRowToCanonical,
+  previewImport,
   processImportBatch,
   runImport,
   undoImport,
@@ -134,6 +135,16 @@ describe("detectMapping", () => {
       Title: "title",
       "Review ID": "externalRef",
     });
+  });
+});
+
+describe("previewImport", () => {
+  it("rejects an unknown preset with a clean validation message instead of throwing a raw TypeError", async () => {
+    const csvText = "name,body,rating\nAlice,Great,5\n";
+
+    await expect(
+      previewImport("shop1.myshopify.com", { csvText, preset: "bogus-preset" as any }),
+    ).rejects.toThrow("Unknown import format: bogus-preset");
   });
 });
 

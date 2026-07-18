@@ -29,17 +29,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
-  switch (intent) {
-    case "sync-products": {
-      const result = await syncProductsFromCatalog(session.shop, admin);
-      return { ok: true, result };
+  try {
+    switch (intent) {
+      case "sync-products": {
+        const result = await syncProductsFromCatalog(session.shop, admin);
+        return { ok: true, result };
+      }
+      case "backfill-ratings": {
+        const result = await backfillAllRatingMetafields(session.shop, admin);
+        return { ok: true, backfillResult: result };
+      }
+      default:
+        return { error: `Unknown intent: ${intent}` };
     }
-    case "backfill-ratings": {
-      const result = await backfillAllRatingMetafields(session.shop, admin);
-      return { ok: true, backfillResult: result };
-    }
-    default:
-      return { error: `Unknown intent: ${intent}` };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Something went wrong" };
   }
 };
 
@@ -55,6 +59,8 @@ export default function Products() {
       shopify.toast.show(
         `Synced ${total} products (${created} created, ${updated} updated)`
       );
+    } else if (syncFetcher.data && "error" in syncFetcher.data && syncFetcher.data.error) {
+      shopify.toast.show(syncFetcher.data.error, { isError: true });
     }
   }, [syncFetcher.data, shopify]);
 
@@ -69,6 +75,8 @@ export default function Products() {
       shopify.toast.show(
         `Backfilled ${synced} products (${skipped} skipped, ${failed} failed)`,
       );
+    } else if (backfillFetcher.data && "error" in backfillFetcher.data && backfillFetcher.data.error) {
+      shopify.toast.show(backfillFetcher.data.error, { isError: true });
     }
   }, [backfillFetcher.data, shopify]);
 
